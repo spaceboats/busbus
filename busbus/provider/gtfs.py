@@ -50,7 +50,7 @@ class GTFSStop(busbus.Stop):
         return iter(self._provider._gtfs_stop_child_index.get(self.id, []))
 
 
-class GTFSRoute(busbus.Agency):
+class GTFSRoute(busbus.Route):
 
     def __init__(self, provider, **data):
         if '_agency_id' in data:
