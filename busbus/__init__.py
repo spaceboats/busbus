@@ -22,8 +22,8 @@ class Engine(object):
             if exc.errno != errno.EEXIST:
                 raise
 
-        # The saved CacheControl objects are pickled using the highest protocol,
-        # which is different between Python 2 and 3.
+        # The saved CacheControl objects are pickled using the highest
+        # protocol, which is different between Python 2 and 3.
         self.config['url_cache_dir'] = os.path.join(
             self.config['busbus_dir'], 'cache3' if six.PY3 else 'cache')
 
@@ -37,8 +37,8 @@ class Agency(BaseEntity):
 
 
 class Stop(BaseEntity):
-    __attrs__ = ('id', 'code', 'name', 'description', 'location', 'zone', 'url',
-                 'parent', 'timezone', 'accessible')
+    __attrs__ = ('id', 'code', 'name', 'description', 'location', 'zone',
+                 'url', 'parent', 'timezone', 'accessible')
 
     @property
     def children(self):
