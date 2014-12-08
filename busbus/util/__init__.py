@@ -19,20 +19,6 @@ class Iterable(object):
         return self.__next__()
 
 
-class Lazy(object):
-
-    def __init__(self, f, *args):
-        self.f = f
-        self.args = args
-        self.called = False
-
-    def __get__(self, instance, owner):
-        if not self.called:
-            self.value = self.f(*self.args)
-            self.called = True
-        return self.value
-
-
 def entity_type(obj):
     try:
         if not isinstance(obj, type):
