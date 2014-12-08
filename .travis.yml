@@ -6,6 +6,8 @@ python:
 install:
   - "pip install -U setuptools"
   - "python setup.py install"
-  - "pip install -U pytest pytest-cov python-coveralls"
-script: "py.test --cov busbus --cov-report term-missing"
-after_script: "coveralls"
+  - "pip install -U pytest coverage python-coveralls"
+script: "coverage run --source busbus -m pytest"
+after_script:
+  - "coverage report -m"
+  - "coveralls"
