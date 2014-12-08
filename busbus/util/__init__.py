@@ -30,7 +30,6 @@ class Lazy(object):
         if not self.called:
             self.value = self.f(*self.args)
             self.called = True
-            print('Lazy.__get__ --> {0}'.format(self.value))
         return self.value
 
 
