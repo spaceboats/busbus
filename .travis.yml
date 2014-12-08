@@ -8,4 +8,4 @@ install:
   - "python setup.py install"
   - "pip install -U pytest pytest-cov python-coveralls"
 script: "py.test --cov busbus --cov-report term-missing"
-after_success: "coveralls"
+after_script: "coveralls"
