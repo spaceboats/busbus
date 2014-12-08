@@ -1,3 +1,7 @@
+# busbus
+
+[![Build Status](https://travis-ci.org/spaceboats/busbus.svg?branch=master)](https://travis-ci.org/spaceboats/busbus)
+
 busbus is a platform for working with mass transit data across multiple
 agencies. The project is currently in early development.
 
