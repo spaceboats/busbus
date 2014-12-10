@@ -35,8 +35,8 @@ class GTFSStop(busbus.Stop):
         if '_zone_id' in data:
             pass  # FIXME
         if '_parent_id' in data:
-            data['parent'] = util.Lazy(provider.get, busbus.Stop,
-                                       data['_parent_id'])
+            data['parent'] = busbus.entity.LazyEntityProperty(
+                provider.get, busbus.Stop, data['_parent_id'])
             if data['_parent_id'] not in provider._gtfs_stop_child_index:
                 provider._gtfs_stop_child_index[data['_parent_id']] = []
             provider._gtfs_stop_child_index[data['_parent_id']].append(self)
@@ -50,12 +50,12 @@ class GTFSStop(busbus.Stop):
         return iter(self._provider._gtfs_stop_child_index.get(self.id, []))
 
 
-class GTFSRoute(busbus.Agency):
+class GTFSRoute(busbus.Route):
 
     def __init__(self, provider, **data):
         if '_agency_id' in data:
-            data['agency'] = util.Lazy(provider.get, busbus.Agency,
-                                       data['_agency_id'])
+            data['agency'] = busbus.entity.LazyEntityProperty(
+                provider.get, busbus.Agency, data['_agency_id'])
         if '_type' in data:
             pass  # FIXME
 
@@ -144,7 +144,7 @@ class GTFSMixin(object):
 
     def get(self, cls, id, default=None):
         try:
-            return self._gtfs_id_index[cls][id]
+            return self._gtfs_id_index[(cls, id)]
         except KeyError:
             return default
 

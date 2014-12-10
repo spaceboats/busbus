@@ -27,7 +27,7 @@ class Engine(object):
         self.config['url_cache_dir'] = os.path.join(
             self.config['busbus_dir'], 'cache3' if six.PY3 else 'cache')
 
-    def register_provider(self, provider):
+    def _register_provider(self, provider):
         self.providers.append(provider)
 
 

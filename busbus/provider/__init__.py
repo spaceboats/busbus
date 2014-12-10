@@ -19,7 +19,7 @@ class ProviderBase(object):
             self.engine = engine
         else:
             self.engine = busbus.Engine()
-        self.engine.register_provider(self)
+        self.engine._register_provider(self)
 
         self._requests = requests.Session()
 
