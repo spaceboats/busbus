@@ -11,3 +11,6 @@ script: "coverage run --source busbus -m pytest --pep8"
 after_script:
   - "coverage report -m"
   - "coveralls"
+notifications:
+  slack:
+    secure: CWJNMK/DvPKB31iDKXAPxaBQz6V2qZftFgTEqVaKbedF34rRGQK4R/OOobQ/PLbJ053tmgERWQl3L67ZeX06qS4PMy86LXv1Tvw5bcIiL7WebxtpCuZzWktVhCz14wtq+5kZXTyB/yT4C0IOoWXDHG0Fc6E9CseTMNT1V8MWNRM=
