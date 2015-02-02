@@ -13,6 +13,7 @@ class LazyEntityProperty(object):
 
 
 class BaseEntity(object):
+    __repr_attrs__ = ('id',)
 
     def __init__(self, provider, **kwargs):
         self._provider = provider
@@ -26,10 +27,11 @@ class BaseEntity(object):
 
         provider._new_entity(self)
 
-    def __repr__(self, args=['id']):
+    def __repr__(self):
         return u'<{0}({1})>'.format(
-            util.clsname(self),
-            ','.join('{0}={1!r}'.format(i, getattr(self, i)) for i in args))
+            util.clsname(self), ','.join(
+                '{0}={1!r}'.format(i, getattr(self, i))
+                for i in self.__repr_attrs__))
 
     def __getattr__(self, name):
         if name in self._lazy_properties:
