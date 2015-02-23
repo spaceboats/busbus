@@ -3,7 +3,7 @@ six
 # HTTP request library -- ASL license
 requests
 # filesystem caching support for requests -- MIT license
-CacheControl
+CacheControl >= 0.10.8
 # required for CacheControl.caches.FileCache -- MIT license
 lockfile
 # parses and standardizes phone numbers -- ASL license

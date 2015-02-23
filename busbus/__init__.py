@@ -1,4 +1,5 @@
 from busbus.entity import BaseEntity
+from busbus.util import Config
 
 import errno
 import os
@@ -11,21 +12,15 @@ class Engine(object):
     subscribing to entity events the providers.
     """
     providers = []
-    config = {}
 
-    def __init__(self):
-        self.config['busbus_dir'] = os.path.join(os.getenv('HOME'), '.busbus')
+    def __init__(self, config=None):
+        self.config = Config(config)
 
         try:
             os.mkdir(self.config['busbus_dir'])
         except OSError as exc:
             if exc.errno != errno.EEXIST:
                 raise
-
-        # The saved CacheControl objects are pickled using the highest
-        # protocol, which is different between Python 2 and 3.
-        self.config['url_cache_dir'] = os.path.join(
-            self.config['busbus_dir'], 'cache3' if six.PY3 else 'cache')
 
     def _register_provider(self, provider):
         self.providers.append(provider)
