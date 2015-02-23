@@ -14,7 +14,7 @@ class Iterable(object):
 
     @abstractmethod
     def __next__(self):
-        return NotImplemented
+        """Provide the next item from the iterator in this method."""
 
     # Python 2 compatibility
     def next(self):

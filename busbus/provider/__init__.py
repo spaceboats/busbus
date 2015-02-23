@@ -28,22 +28,24 @@ class ProviderBase(object):
         self._cached_requests = CacheControl(self._requests, cache=FileCache(
             self.engine.config['url_cache_dir']))
 
-    @abstractmethod
     def _new_entity(self, entity):
-        return NotImplemented
+        """
+        Method to receive knowledge of a new entity -- does nothing if not
+        overridden
+        """
 
     @abstractmethod
     def get(self, entity, id, default=None):
-        return NotImplemented
+        """Return the requested entity, or default if it doesn't exist"""
 
     @abstractproperty
     def agencies(self):
-        return NotImplemented
+        """Return an iterator of the agencies for this provider"""
 
     @abstractproperty
     def stops(self):
-        return NotImplemented
+        """Return an iterator of the stops for this provider"""
 
     @abstractproperty
     def routes(self):
-        return NotImplemented
+        """Return an iterator of the routes for this provider"""

@@ -38,7 +38,7 @@ class BaseEntity(object):
             setattr(self, name, value)
             return value
         else:
-            raise AttributeError()
+            raise AttributeError(name)
 
     def to_dict(self):
         return dict((attr, getattr(self, attr)) for attr in self.__attrs__
