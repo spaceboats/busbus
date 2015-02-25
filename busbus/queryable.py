@@ -17,5 +17,10 @@ class Queryable(util.Iterable):
                     any(query_func(value) for query_func in self.query_funcs):
                 return value
 
-    def where(self, query_func):
-        return Queryable(self.it, self.query_funcs + (query_func,))
+    def where(self, query_func=None, **kwargs):
+        if not query_func and not kwargs:
+            return self
+        new_funcs = [query_func] if query_func else []
+        for k, v in kwargs.items():
+            new_funcs.append(lambda obj: getattr(obj, k) == v)
+        return Queryable(self.it, self.query_funcs + tuple(new_funcs))
