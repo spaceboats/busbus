@@ -4,6 +4,7 @@ from busbus.queryable import Queryable
 from busbus import util
 import busbus.util.csv as utilcsv
 
+import itertools
 import phonenumbers
 import six
 import zipfile
@@ -62,6 +63,12 @@ class GTFSRoute(busbus.Route):
         super(GTFSRoute, self).__init__(provider, **data)
 
 
+class GTFSArrival(busbus.Arrival):
+
+    def __init__(self, provider, **data):
+        super(GTFSArrival, self).__init__(provider, **data)
+
+
 GTFS_FILENAME_MAP = {
     'agency.txt': {
         'rewriter': {
@@ -108,6 +115,34 @@ GTFS_FILENAME_MAP = {
 }
 
 
+class GTFSArrivalQueryable(Queryable):
+    """
+    Private class to build the GTFSMixin.arrivals Queryable.
+    """
+
+    def __init__(self, provider, query_funcs=None, **kwargs):
+        self.provider = provider
+        if 'stop_id' in kwargs:
+            stop_id = kwargs.pop('stop_id')
+            kwargs['stop'] = provider.get(busbus.Stop, stop_id)
+        if 'route_id' in kwargs:
+            route_id = kwargs.pop('route_id')
+            kwargs['route'] = provider.get(busbus.Route, route_id)
+        it = itertools.chain.from_iterable(
+            provider._build_arrivals(stop, route)
+            for stop in ((kwargs['stop'],) if 'stop' in kwargs
+                         else provider.stops)
+            for route in ((kwargs['route'],) if 'route' in kwargs
+                          else provider.routes))
+        self.kwargs = kwargs
+        super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
+
+    def where(self, query_func=None, **kwargs):
+        new_funcs = (self.query_funcs + (query_func,) if query_func else
+                     self.query_funcs)
+        return GTFSArrivalQueryable(self.provider, new_funcs, self.kwargs)
+
+
 class GTFSMixin(object):
     """
     Mixin to parse transit data from a General Transit Feed Specification feed.
@@ -140,7 +175,11 @@ class GTFSMixin(object):
 
     def _new_entity(self, entity):
         cls = util.entity_type(entity)
-        self._gtfs_id_index[(cls, entity.id)] = entity
+        if 'id' in cls.__attrs__:
+            self._gtfs_id_index[(cls, entity.id)] = entity
+
+    def _build_arrivals(self, stop, route):
+        yield GTFSArrival(self, stop=stop, route=route)
 
     def get(self, cls, id, default=None):
         try:
@@ -159,3 +198,7 @@ class GTFSMixin(object):
     @property
     def routes(self):
         return Queryable(self._gtfs_entities[busbus.Route])
+
+    @property
+    def arrivals(self):
+        return GTFSArrivalQueryable(self)
