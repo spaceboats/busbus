@@ -1,4 +1,4 @@
-from test_provider_gtfs import SampleGTFSProvider, provider
+from test_provider_gtfs import provider
 
 import pytest
 
