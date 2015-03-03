@@ -176,7 +176,7 @@ class GTFSMixin(object):
     @staticmethod
     def _rewrite(data, rewriter):
         return {rewriter[col]: datum for col, datum in data
-                if datum and col in rewriter}
+                if len(datum) > 0 and col in rewriter}
 
     def _new_entity(self, entity):
         cls = util.entity_type(entity)
