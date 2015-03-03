@@ -90,6 +90,7 @@ class GTFSRoute(busbus.Route):
 
 
 class GTFSArrival(busbus.Arrival):
+    __derived__ = True
 
     def __init__(self, provider, **data):
         super(GTFSArrival, self).__init__(provider, **data)
