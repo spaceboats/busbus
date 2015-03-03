@@ -33,6 +33,12 @@ def test_agencies_len(provider):
 def test_stops_len(provider):
     assert len(list(provider.stops)) == 9
 
+    stop = next(provider.stops)
+    # Empty CSV fields should be coerced to None
+    assert stop.description is None
+    # stops.txt inherits agency timezone if blank
+    assert stop.timezone == 'America/Los_Angeles'
+
 
 def test_routes_len(provider):
     assert len(list(provider.routes)) == 5

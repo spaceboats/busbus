@@ -4,6 +4,7 @@ from busbus.queryable import Queryable
 from busbus import util
 import busbus.util.csv as utilcsv
 
+from collections import OrderedDict
 import itertools
 import phonenumbers
 import six
@@ -41,6 +42,11 @@ class GTFSStop(busbus.Stop):
             if data['_parent_id'] not in provider._gtfs_stop_child_index:
                 provider._gtfs_stop_child_index[data['_parent_id']] = []
             provider._gtfs_stop_child_index[data['_parent_id']].append(self)
+        if not data.get('timezone', None):
+            for agency in provider.agencies:
+                if agency.timezone:
+                    data['timezone'] = agency.timezone
+                    break
         if '_accessible' in data:
             pass  # FIXME
 
@@ -69,8 +75,8 @@ class GTFSArrival(busbus.Arrival):
         super(GTFSArrival, self).__init__(provider, **data)
 
 
-GTFS_FILENAME_MAP = {
-    'agency.txt': {
+GTFS_FILENAME_MAP = OrderedDict([
+    ('agency.txt', {
         'rewriter': {
             'agency_id': 'id',
             'agency_name': 'name',
@@ -81,8 +87,8 @@ GTFS_FILENAME_MAP = {
             'agency_fare_url': 'fare_url',
         },
         'class': GTFSAgency,
-    },
-    'stops.txt': {
+    }),
+    ('stops.txt', {
         'rewriter': {
             'stop_id': 'id',
             'stop_code': 'code',
@@ -97,8 +103,8 @@ GTFS_FILENAME_MAP = {
             'accessible': '_accessible',
         },
         'class': GTFSStop,
-    },
-    'routes.txt': {
+    }),
+    ('routes.txt', {
         'rewriter': {
             'route_id': 'id',
             'agency_id': '_agency_id',
@@ -111,8 +117,8 @@ GTFS_FILENAME_MAP = {
             'route_text_color': 'text_color',
         },
         'class': GTFSRoute,
-    },
-}
+    }),
+])
 
 
 class GTFSArrivalQueryable(Queryable):
