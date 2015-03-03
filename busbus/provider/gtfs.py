@@ -40,9 +40,8 @@ class GTFSStop(busbus.Stop):
         if '_parent_id' in data:
             data['parent'] = busbus.entity.LazyEntityProperty(
                 provider.get, busbus.Stop, data['_parent_id'])
-            if data['_parent_id'] not in provider._gtfs_stop_child_index:
-                provider._gtfs_stop_child_index[data['_parent_id']] = []
-            provider._gtfs_stop_child_index[data['_parent_id']].append(self)
+            provider._add_relation(busbus.Stop, data['_parent_id'],
+                                   'children', self)
         if not data.get('timezone', None):
             for agency in provider.agencies:
                 if agency.timezone:
@@ -55,7 +54,7 @@ class GTFSStop(busbus.Stop):
 
     @property
     def children(self):
-        return iter(self._provider._gtfs_stop_child_index.get(self.id, []))
+        return iter(self._provider._get_relation(self, 'children'))
 
 
 class GTFSRoute(busbus.Route):
@@ -210,7 +209,7 @@ class GTFSMixin(object):
         super(GTFSMixin, self).__init__(engine)
         self._gtfs_entities = {e: list() for e in busbus.ENTITIES}
         self._gtfs_id_index = {}
-        self._gtfs_stop_child_index = {}
+        self._gtfs_rel_index = {}
 
         resp = self._cached_requests.get(gtfs_url)
 
@@ -240,6 +239,21 @@ class GTFSMixin(object):
 
     def _build_arrivals(self, stop, route):
         yield GTFSArrival(self, stop=stop, route=route)
+
+    def _add_relation(self, cls, id, relation, other):
+        rel = (util.entity_type(cls), relation)
+        if rel not in self._gtfs_rel_index:
+            self._gtfs_rel_index[rel] = {}
+        if id not in self._gtfs_rel_index[rel]:
+            self._gtfs_rel_index[rel][id] = set()
+        self._gtfs_rel_index[rel][id].add(other)
+
+    def _get_relation(self, obj, relation):
+        rel = (util.entity_type(obj), relation)
+        if rel in self._gtfs_rel_index:
+            return self._gtfs_rel_index[rel].get(obj.id, [])
+        else:
+            return []
 
     def get(self, cls, id, default=None):
         try:
