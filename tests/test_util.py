@@ -1,4 +1,5 @@
 import busbus
+import busbus.entity
 from busbus import util
 
 import pytest
@@ -11,5 +12,7 @@ def test_util_clsname():
 
 def test_util_entity_type_error():
     engine = busbus.Engine()
+    with pytest.raises(TypeError):
+        busbus.util.entity_type(busbus.entity.BaseEntity)
     with pytest.raises(TypeError):
         busbus.util.entity_type(engine)
