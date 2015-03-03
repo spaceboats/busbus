@@ -331,7 +331,9 @@ class GTFSArrivalQueryable(Queryable):
     def where(self, query_func=None, **kwargs):
         new_funcs = (self.query_funcs + (query_func,) if query_func else
                      self.query_funcs)
-        return GTFSArrivalQueryable(self.provider, new_funcs, self.kwargs)
+        new_kwargs = copy(self.kwargs)
+        new_kwargs.update(kwargs)
+        return GTFSArrivalQueryable(self.provider, new_funcs, new_kwargs)
 
 
 class GTFSMixin(object):
