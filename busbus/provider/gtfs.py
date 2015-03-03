@@ -61,8 +61,7 @@ class GTFSRoute(busbus.Route):
 
     def __init__(self, provider, **data):
         if '_agency_id' in data:
-            data['agency'] = busbus.entity.LazyEntityProperty(
-                provider.get, busbus.Agency, data['_agency_id'])
+            data['agency'] = provider.get(busbus.Agency, data['_agency_id'])
         if '_type' in data:
             pass  # FIXME
 
