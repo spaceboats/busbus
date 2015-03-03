@@ -8,7 +8,7 @@ import six
 
 class SampleGTFSProvider(GTFSMixin, ProviderBase):
 
-    def __init__(self, engine):
+    def __init__(self, engine=None):
         # https://developers.google.com/transit/gtfs/examples/gtfs-feed
         # FIXME We should eventually roll our own GTFS feed as well in order to
         # test everything
@@ -19,7 +19,11 @@ class SampleGTFSProvider(GTFSMixin, ProviderBase):
 
 @pytest.fixture(scope='module')
 def provider():
-    return SampleGTFSProvider(busbus.Engine())
+    return SampleGTFSProvider()
+
+
+def test_provider_with_engine():
+    SampleGTFSProvider(busbus.Engine())
 
 
 def test_agencies_len(provider):
