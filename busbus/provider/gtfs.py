@@ -7,6 +7,7 @@ import busbus.util.csv as utilcsv
 import arrow
 from collections import OrderedDict
 import itertools
+import operator
 import phonenumbers
 import six
 import zipfile
@@ -150,7 +151,8 @@ class GTFSTrip(busbus.entity.BaseEntity):
 
     @property
     def stop_times(self):
-        return iter(self._provider._get_relation(self, 'stop_times'))
+        return sorted(self._provider._get_relation(self, 'stop_times'),
+                      key=operator.attrgetter('sequence'))
 
 
 class GTFSTripFrequency(busbus.entity.BaseEntity):
