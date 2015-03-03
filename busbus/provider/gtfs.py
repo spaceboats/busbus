@@ -12,6 +12,26 @@ import six
 import zipfile
 
 
+def parse_gtfs_time(timestr):
+    """
+    GTFS time strings are HH:MM:SS (or H:MM:SS if the hours field is less than
+    10). The hours field can go over 23 to represent a time on the following
+    day (GTFS time never decreases in a given trip).
+
+    This function is not quite that picky, but its behavior is undefined if
+    it's given a string not following the specification.
+
+    This function returns a tuple: (hours, minutes, seconds).
+    """
+    split = [int(x) for x in timestr.split(':')[-3:]]
+    split = [0] * (3 - len(split)) + split
+    for i in (2, 1):
+        if split[i] >= 60:
+            split[i-1] += split[i] // 60
+            split[i] %= 60
+    return tuple(split)
+
+
 class GTFSAgency(busbus.Agency):
 
     def __init__(self, provider, **data):
@@ -101,6 +121,80 @@ class GTFSService(busbus.entity.BaseEntity):
         getattr(service, attr).add(arrow.get(data['date'], 'YYYYMMDD').date())
 
 
+class GTFSTrip(busbus.entity.BaseEntity):
+    __attrs__ = ('id', 'route', 'direction', 'service', 'headsign',
+                 'short_name', 'block', 'shape', 'accessible', 'bikes_ok')
+
+    def __init__(self, provider, **data):
+        data['route'] = provider.get(busbus.Route, data['_route_id'])
+        data['service'] = provider.get(GTFSService, data['_service_id'])
+        if 'direction' in data:
+            try:
+                data['direction'] = int(data['direction'])
+            except ValueError:
+                pass
+        if '_block_id' in data:
+            pass  # FIXME
+        if '_shape_id' in data:
+            pass  # FIXME
+        if '_accessible' in data:
+            pass  # FIXME
+        if '_bikes' in data:
+            data['bikes_ok'] = {u'0': None, u'1': True,
+                                u'2': False}[data['_bikes']]
+        super(GTFSTrip, self).__init__(provider, **data)
+
+    @property
+    def frequencies(self):
+        return iter(self._provider._get_relation(self, 'frequencies'))
+
+    @property
+    def stop_times(self):
+        return iter(self._provider._get_relation(self, 'stop_times'))
+
+
+class GTFSTripFrequency(busbus.entity.BaseEntity):
+    __attrs__ = ('trip', 'start_time', 'end_time', 'headway', 'exact_times')
+    __repr_attrs__ = ('trip', 'start_time', 'end_time')
+
+    def __init__(self, provider, **data):
+        data['trip'] = provider.get(GTFSTrip, data['_trip_id'])
+        for attr in ('start_time', 'end_time'):
+            data[attr] = parse_gtfs_time(data[attr])
+        data['headway'] = int(data['headway'])
+        if 'exact_times' in data:
+            data['exact_times'] = bool(int(data['exact_times']))
+        provider._add_relation(GTFSTrip, data['_trip_id'], 'frequencies', self)
+        super(GTFSTripFrequency, self).__init__(provider, **data)
+
+
+class GTFSStopTime(busbus.entity.BaseEntity):
+    __attrs__ = ('trip', 'stop', 'arrival_time', 'departure_time', 'sequence',
+                 'headsign', 'pickup', 'dropoff', 'shape_dist_traveled',
+                 'exact_times')
+
+    def __init__(self, provider, **data):
+        data['trip'] = provider.get(GTFSTrip, data['_trip_id'])
+        data['stop'] = provider.get(GTFSTrip, data['_stop_id'])
+        for attr in ('arrival_time', 'departure_time'):
+            if attr in data:
+                data[attr] = parse_gtfs_time(data[attr])
+        data['sequence'] = int(data['sequence'])
+        if 'pickup' in data:
+            pass  # FIXME
+        if 'dropoff' in data:
+            pass  # FIXME
+        if 'shape_dist_traveled' in data:
+            data['shape_dist_traveled'] = float(data['shape_dist_traveled'])
+        if 'exact_times' in data:
+            data['exact_times'] = {u'0': False, u'1': True}.get(
+                data['exact_times'], True)
+        provider._add_relation(GTFSTrip, data['_trip_id'], 'stop_times', self)
+        provider._add_relation(busbus.Stop, data['_stop_id'], 'trips',
+                               data['trip'])
+        super(GTFSStopTime, self).__init__(provider, **data)
+
+
 GTFS_FILENAME_MAP = OrderedDict([
     ('agency.txt', {
         'rewriter': {
@@ -166,6 +260,46 @@ GTFS_FILENAME_MAP = OrderedDict([
             'exception_type': 'type',
         },
         'function': GTFSService.handle_calendar_dates,
+    }),
+    ('trips.txt', {
+        'rewriter': {
+            'route_id': '_route_id',
+            'service_id': '_service_id',
+            'trip_id': 'id',
+            'trip_headsign': 'headsign',
+            'trip_short_name': 'short_name',
+            'direction_id': 'direction',
+            'block_id': '_block_id',
+            'shape_id': '_shape_id',
+            'wheelchair_accessible': '_accessible',
+            'bikes_allowed': '_bikes',
+        },
+        'class': GTFSTrip,
+    }),
+    ('frequencies.txt', {
+        'rewriter': {
+            'trip_id': '_trip_id',
+            'start_time': 'start_time',
+            'end_time': 'end_time',
+            'headway_secs': 'headway',
+            'exact_times': 'exact_times',
+        },
+        'class': GTFSTripFrequency,
+    }),
+    ('stop_times.txt', {
+        'rewriter': {
+            'trip_id': '_trip_id',
+            'stop_id': '_stop_id',
+            'arrival_time': 'arrival_time',
+            'departure_time': 'departure_time',
+            'stop_sequence': 'sequence',
+            'stop_headsign': 'headsign',
+            'pickup_type': 'pickup',
+            'drop_off_type': 'dropoff',
+            'shape_dist_traveled': 'shape_dist_traveled',
+            'timepoint': 'exact_times',
+        },
+        'class': GTFSStopTime,
     }),
 ])
 
