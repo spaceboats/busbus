@@ -4,6 +4,7 @@ from busbus.queryable import Queryable
 from busbus import util
 import busbus.util.csv as utilcsv
 
+import arrow
 from collections import OrderedDict
 import itertools
 import phonenumbers
@@ -74,6 +75,33 @@ class GTFSArrival(busbus.Arrival):
         super(GTFSArrival, self).__init__(provider, **data)
 
 
+class GTFSService(busbus.entity.BaseEntity):
+    __attrs__ = ('id', 'days', 'start_date', 'end_date', 'added_dates',
+                 'removed_dates')
+
+    def __init__(self, provider, **data):
+        # Days of the week: 1 = Monday, 7 = Sunday (ISO 8601)
+        days = ('monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+                'saturday', 'sunday')
+        data['days'] = list(i + 1 for i, day in enumerate(days)
+                            if data.get(day) == u'1')
+        for attr in ('start_date', 'end_date'):
+            if attr in data:
+                data[attr] = arrow.get(data[attr], 'YYYYMMDD').date()
+
+        super(GTFSService, self).__init__(provider, **data)
+
+    @classmethod
+    def handle_calendar_dates(cls, provider, **data):
+        if not all(x in data for x in ('id', 'date', 'type')):
+            return
+        service = provider.get(cls, data['id'])
+        attr = {u'1': 'added_dates', u'2': 'removed_dates'}[data['type']]
+        if getattr(service, attr) is None:
+            setattr(service, attr, set())
+        getattr(service, attr).add(arrow.get(data['date'], 'YYYYMMDD').date())
+
+
 GTFS_FILENAME_MAP = OrderedDict([
     ('agency.txt', {
         'rewriter': {
@@ -116,6 +144,29 @@ GTFS_FILENAME_MAP = OrderedDict([
             'route_text_color': 'text_color',
         },
         'class': GTFSRoute,
+    }),
+    ('calendar.txt', {
+        'rewriter': {
+            'service_id': 'id',
+            'monday': 'monday',
+            'tuesday': 'tuesday',
+            'wednesday': 'wednesday',
+            'thursday': 'thursday',
+            'friday': 'friday',
+            'saturday': 'saturday',
+            'sunday': 'sunday',
+            'start_date': 'start_date',
+            'end_date': 'end_date',
+        },
+        'class': GTFSService,
+    }),
+    ('calendar_dates.txt', {
+        'rewriter': {
+            'service_id': 'id',
+            'date': 'date',
+            'exception_type': 'type',
+        },
+        'function': GTFSService.handle_calendar_dates,
     }),
 ])
 
@@ -168,10 +219,14 @@ class GTFSMixin(object):
                 with z.open(filename) as f:
                     dataset = (self._rewrite(data, mapping['rewriter'])
                                for data in utilcsv.CSVReader(f))
-                    cls = mapping['class']
-                    basecls = util.entity_type(cls)
-                    self._gtfs_entities[basecls] = [cls(self, **data)
-                                                    for data in dataset]
+                    if 'class' in mapping:
+                        cls = mapping['class']
+                        basecls = util.entity_type(cls)
+                        self._gtfs_entities[basecls] = [cls(self, **data)
+                                                        for data in dataset]
+                    elif 'function' in mapping:
+                        for data in dataset:
+                            mapping['function'](self, **data)
 
     @staticmethod
     def _rewrite(data, rewriter):

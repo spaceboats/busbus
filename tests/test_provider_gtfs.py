@@ -1,6 +1,6 @@
 import busbus
 from busbus.provider import ProviderBase
-from busbus.provider.gtfs import GTFSMixin
+from busbus.provider.gtfs import GTFSMixin, GTFSService
 
 import pytest
 import six
@@ -64,3 +64,9 @@ def test_stops_latlon(provider):
 def test_routes_agency(provider):
     for route in provider.routes:
         assert route.agency.id == 'DTA'
+
+
+def test_service(provider):
+    assert len(provider._gtfs_entities[GTFSService]) == 2
+    fullw = provider.get(GTFSService, u'FULLW')
+    assert len(fullw.removed_dates) == 1
