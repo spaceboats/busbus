@@ -125,17 +125,12 @@ class GTFSService(busbus.entity.BaseEntity):
 
 
 class GTFSTrip(busbus.entity.BaseEntity):
-    __attrs__ = ('id', 'route', 'direction', 'service', 'headsign',
-                 'short_name', 'block', 'shape', 'accessible', 'bikes_ok')
+    __attrs__ = ('id', 'route', 'service', 'headsign', 'short_name', 'block',
+                 'shape', 'accessible', 'bikes_ok')
 
     def __init__(self, provider, **data):
         data['route'] = provider.get(busbus.Route, data['_route_id'])
         data['service'] = provider.get(GTFSService, data['_service_id'])
-        if 'direction' in data:
-            try:
-                data['direction'] = int(data['direction'])
-            except ValueError:
-                pass
         if '_block_id' in data:
             pass  # FIXME
         if '_shape_id' in data:
@@ -273,7 +268,6 @@ GTFS_FILENAME_MAP = OrderedDict([
             'trip_id': 'id',
             'trip_headsign': 'headsign',
             'trip_short_name': 'short_name',
-            'direction_id': 'direction',
             'block_id': '_block_id',
             'shape_id': '_shape_id',
             'wheelchair_accessible': '_accessible',
