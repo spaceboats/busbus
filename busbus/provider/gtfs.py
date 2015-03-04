@@ -319,12 +319,7 @@ class GTFSArrivalQueryable(Queryable):
         if 'route_id' in kwargs:
             route_id = kwargs.pop('route_id')
             kwargs['route'] = provider.get(busbus.Route, route_id)
-        it = itertools.chain.from_iterable(
-            provider._build_arrivals(stop, route)
-            for stop in ((kwargs['stop'],) if 'stop' in kwargs
-                         else provider.stops)
-            for route in ((kwargs['route'],) if 'route' in kwargs
-                          else provider.routes))
+        it = provider._build_arrivals(**kwargs)
         self.kwargs = kwargs
         super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
 
@@ -375,8 +370,27 @@ class GTFSMixin(object):
         if 'id' in cls.__attrs__:
             self._gtfs_id_index[(cls, entity.id)] = entity
 
-    def _build_arrivals(self, stop, route):
-        yield GTFSArrival(self, stop=stop, route=route)
+    def _build_arrivals(self, **kw):
+        start = kw.get('start_time', arrow.now()).to(self._timezone)
+        end = kw.get('end_time', start.replace(hours=3))
+        if end <= start:
+            return
+        for route in ((kw['route'],) if 'route' in kw else self.routes):
+            for stop in ((kw['stop'],) if 'stop' in kw else self.stops):
+                for trip in stop._trips.where(route=route):
+                    for stop_time in trip.stop_times.where(stop=stop):
+                        for day in arrow.Arrow.range('day', start.floor('day'),
+                                                     end.ceil('day')):
+                            arr = day.replace(**stop_time.arrival_time)
+                            if not (start <= arr <= end):
+                                continue
+                            dep = (day.replace(**stop_time.departure_time) if
+                                   stop_time.departure_time else None)
+                            yield GTFSArrival(self, stop=stop, route=route,
+                                              time=arr, departure_time=dep,
+                                              headsign=trip.headsign,
+                                              short_name=trip.short_name,
+                                              bikes_ok=trip.bikes_ok)
 
     def _add_relation(self, cls, id, relation, other):
         rel = (util.entity_type(cls), relation)
