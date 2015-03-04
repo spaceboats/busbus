@@ -64,10 +64,7 @@ class GTFSStop(busbus.Stop):
             provider._add_relation(busbus.Stop, data['_parent_id'],
                                    'children', self)
         if not data.get('timezone', None):
-            for agency in provider.agencies:
-                if agency.timezone:
-                    data['timezone'] = agency.timezone
-                    break
+            data['timezone'] = provider._timezone
         if '_accessible' in data:
             pass  # FIXME
 
@@ -399,6 +396,13 @@ class GTFSMixin(object):
             return self._gtfs_id_index[(cls, id)]
         except KeyError:
             return default
+
+    @property
+    def _timezone(self):
+        for agency in self.agencies:
+            if agency.timezone:
+                return agency.timezone
+        return None
 
     @property
     def agencies(self):
