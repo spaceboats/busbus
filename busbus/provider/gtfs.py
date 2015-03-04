@@ -395,7 +395,7 @@ class GTFSMixin(object):
 
     def get(self, cls, id, default=None):
         try:
-            return self._gtfs_id_index[(cls, id)]
+            return self._gtfs_id_index[(util.entity_type(cls), id)]
         except KeyError:
             return default
 
