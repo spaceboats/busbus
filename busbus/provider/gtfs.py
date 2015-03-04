@@ -179,6 +179,9 @@ class GTFSStopTime(busbus.entity.BaseEntity):
         for attr in ('arrival_time', 'departure_time'):
             if attr in data:
                 data[attr] = parse_gtfs_time(data[attr])
+        if 'departure_time' in data:
+            if data['departure_time'] == data['arrival_time']:
+                del data['departure_time']
         data['sequence'] = int(data['sequence'])
         if 'pickup' in data:
             pass  # FIXME
