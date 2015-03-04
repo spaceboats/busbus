@@ -22,7 +22,7 @@ def parse_gtfs_time(timestr):
     This function is not quite that picky, but its behavior is undefined if
     it's given a string not following the specification.
 
-    This function returns a tuple: (hours, minutes, seconds).
+    This function returns a dict, with keys ('hours', 'minutes', 'seconds').
     """
     split = [int(x) for x in timestr.split(':')[-3:]]
     split = [0] * (3 - len(split)) + split
@@ -30,7 +30,7 @@ def parse_gtfs_time(timestr):
         if split[i] >= 60:
             split[i-1] += split[i] // 60
             split[i] %= 60
-    return tuple(split)
+    return dict(zip(('hours', 'minutes', 'seconds'), split))
 
 
 class GTFSAgency(busbus.Agency):
