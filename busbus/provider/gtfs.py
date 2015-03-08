@@ -6,6 +6,7 @@ import busbus.util.csv as utilcsv
 
 import arrow
 from collections import OrderedDict
+import datetime
 import itertools
 import operator
 import phonenumbers
@@ -16,21 +17,20 @@ import zipfile
 def parse_gtfs_time(timestr):
     """
     GTFS time strings are HH:MM:SS (or H:MM:SS if the hours field is less than
-    10). The hours field can go over 23 to represent a time on the following
-    day (GTFS time never decreases in a given trip).
+    10). The time is relative to noon on a given day, and the hours field can
+    go over 23 to represent a time on the following day (GTFS time never
+    decreases in a given trip).
 
     This function is not quite that picky, but its behavior is undefined if
     it's given a string not following the specification.
 
-    This function returns a dict, with keys ('hours', 'minutes', 'seconds').
+    This function returns a timedelta, which contains the number of seconds
+    since noon represented by a time on a given day.
     """
     split = [int(x) for x in timestr.split(':')[-3:]]
     split = [0] * (3 - len(split)) + split
-    for i in (2, 1):
-        if split[i] >= 60:
-            split[i-1] += split[i] // 60
-            split[i] %= 60
-    return dict(zip(('hours', 'minutes', 'seconds'), split))
+    return datetime.timedelta(hours=split[0] - 12, minutes=split[1],
+                              seconds=split[2])
 
 
 class GTFSAgency(busbus.Agency):
@@ -381,6 +381,7 @@ class GTFSMixin(object):
                     for stop_time in trip.stop_times.where(stop=stop):
                         for day in arrow.Arrow.range('day', start.floor('day'),
                                                      end.ceil('day')):
+                            day += datetime.timedelta(hours=12)  # noon start
                             arr = day.replace(**stop_time.arrival_time)
                             if not (start <= arr <= end):
                                 continue
