@@ -2,6 +2,7 @@ import busbus
 from busbus.provider import ProviderBase
 from busbus.provider.gtfs import GTFSMixin, GTFSService
 
+import arrow
 import pytest
 import six
 
@@ -70,3 +71,26 @@ def test_service(provider):
     assert len(provider._gtfs_entities[GTFSService]) == 2
     fullw = provider.get(GTFSService, u'FULLW')
     assert len(fullw.removed_dates) == 1
+
+
+@pytest.mark.parametrize('time,stop_id,count', [
+    # for STAGECOACH, 06:45-09:45:
+    # STBA: 6 arrivals (every half hour)
+    # CITY1: 2 arrivals from 06:45-07:59 (every half hour)
+    #       10 arrivals from 08:00-09:45 (every 10 minutes)
+    # CITY2: same, plus another arrival from the 06:30 trip
+    # Sunday
+    ('2007-06-03T06:45:00-07:00', u'STAGECOACH', 31),
+    ('2007-06-03T06:45:00-07:00', u'AMV', 1),
+    # Monday (FULLW exception)
+    ('2007-06-04T06:45:00-07:00', u'STAGECOACH', 0),
+    ('2007-06-04T06:45:00-07:00', u'AMV', 0),
+    # Tuesday
+    ('2007-06-05T06:45:00-07:00', u'STAGECOACH', 31),
+    ('2007-06-05T06:45:00-07:00', u'AMV', 0)
+])
+def test_valid_arrivals(provider, time, stop_id, count):
+    time = arrow.get(time)
+    stop = provider.get(busbus.Stop, stop_id)
+    assert (len(list(provider.arrivals.where(stop=stop, start_time=time))) ==
+            count)

@@ -383,6 +383,25 @@ class GTFSMixin(object):
         end = kw.get('end_time', start.replace(hours=3))
         if end <= start:
             return
+
+        def valid_date(service, day):
+            return ((service.start_date <= day <= service.end_date) and
+                    (day not in service.removed_dates) and
+                    (day.isoweekday() in service.days or
+                     day in service.added_dates))
+
+        def build_arrival(stop, route, trip, stop_time,
+                          offset=datetime.timedelta()):
+            arr = day + stop_time.arrival_time + offset
+            if not (start <= arr <= end):
+                return
+            dep = (day + stop_time.departure_time + offset if
+                   stop_time.departure_time else None)
+            return GTFSArrival(self, stop=stop, route=route, time=arr,
+                               departure_time=dep, headsign=trip.headsign,
+                               short_name=trip.short_name,
+                               bikes_ok=trip.bikes_ok)
+
         for route in ((kw['route'],) if 'route' in kw else self.routes):
             for stop in ((kw['stop'],) if 'stop' in kw else self.stops):
                 for trip in stop._trips.where(route=route):
@@ -390,16 +409,30 @@ class GTFSMixin(object):
                         for day in arrow.Arrow.range('day', start.floor('day'),
                                                      end.ceil('day')):
                             day += datetime.timedelta(hours=12)  # noon start
-                            arr = day.replace(**stop_time.arrival_time)
-                            if not (start <= arr <= end):
-                                continue
-                            dep = (day.replace(**stop_time.departure_time) if
-                                   stop_time.departure_time else None)
-                            yield GTFSArrival(self, stop=stop, route=route,
-                                              time=arr, departure_time=dep,
-                                              headsign=trip.headsign,
-                                              short_name=trip.short_name,
-                                              bikes_ok=trip.bikes_ok)
+                            if valid_date(trip.service, day.date()):
+                                for freq in trip.frequencies:
+                                    first = day + \
+                                        next(trip.stop_times).arrival_time
+                                    diff = day + stop_time.arrival_time - first
+                                    freq_start = day + freq.start_time
+                                    freq_end = day + freq.end_time
+                                    rel_time = freq_start - first
+                                    offset = datetime.timedelta()
+                                    headway = datetime.timedelta(
+                                        seconds=freq.headway)
+                                    while freq_start + offset <= freq_end:
+                                        arr = build_arrival(stop, route, trip,
+                                                            stop_time,
+                                                            offset + rel_time)
+                                        if arr:
+                                            yield arr
+                                        offset += headway
+                                    # don't build arrivals out of this block
+                                    continue
+                                arrival = build_arrival(stop, route, trip,
+                                                        stop_time)
+                                if arrival:
+                                    yield arrival
 
     def _add_relation(self, cls, id, relation, other):
         rel = (util.entity_type(cls), relation)
