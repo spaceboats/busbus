@@ -405,18 +405,17 @@ class GTFSMixin(object):
         for route in ((kw['route'],) if 'route' in kw else self.routes):
             for stop in ((kw['stop'],) if 'stop' in kw else self.stops):
                 for trip in stop._trips.where(route=route):
+                    first_stop = next(trip.stop_times)
                     for stop_time in trip.stop_times.where(stop=stop):
                         for day in arrow.Arrow.range('day', start.floor('day'),
                                                      end.ceil('day')):
                             day += datetime.timedelta(hours=12)  # noon start
                             if valid_date(trip.service, day.date()):
                                 for freq in trip.frequencies:
-                                    first = day + \
-                                        next(trip.stop_times).arrival_time
-                                    diff = day + stop_time.arrival_time - first
                                     freq_start = day + freq.start_time
                                     freq_end = day + freq.end_time
-                                    rel_time = freq_start - first
+                                    rel_time = freq_start - (
+                                        day + first_stop.arrival_time)
                                     offset = datetime.timedelta()
                                     headway = datetime.timedelta(
                                         seconds=freq.headway)
