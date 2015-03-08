@@ -144,7 +144,9 @@ class GTFSTrip(busbus.entity.BaseEntity):
 
     @property
     def frequencies(self):
-        return Queryable(self._provider._get_relation(self, 'frequencies'))
+        return Queryable(sorted(
+            self._provider._get_relation(self, 'frequencies'),
+            key=operator.attrgetter('start_time')))
 
     @property
     def stop_times(self):
