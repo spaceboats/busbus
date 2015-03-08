@@ -110,6 +110,8 @@ class GTFSService(busbus.entity.BaseEntity):
         for attr in ('start_date', 'end_date'):
             if attr in data:
                 data[attr] = arrow.get(data[attr], 'YYYYMMDD').date()
+        data['added_dates'] = set()
+        data['removed_dates'] = set()
 
         super(GTFSService, self).__init__(provider, **data)
 
@@ -119,8 +121,6 @@ class GTFSService(busbus.entity.BaseEntity):
             return
         service = provider.get(cls, data['id'])
         attr = {u'1': 'added_dates', u'2': 'removed_dates'}[data['type']]
-        if getattr(service, attr) is None:
-            setattr(service, attr, set())
         getattr(service, attr).add(arrow.get(data['date'], 'YYYYMMDD').date())
 
 
