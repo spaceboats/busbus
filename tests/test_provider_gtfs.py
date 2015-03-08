@@ -40,6 +40,10 @@ def test_stops_len(provider):
     # stops.txt inherits agency timezone if blank
     assert stop.timezone == 'America/Los_Angeles'
 
+    # none of the stops have children
+    for stop in provider.stops:
+        assert len(list(stop.children)) == 0
+
 
 def test_routes_len(provider):
     assert len(list(provider.routes)) == 5
