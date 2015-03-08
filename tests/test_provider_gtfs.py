@@ -3,6 +3,7 @@ from busbus.provider import ProviderBase
 from busbus.provider.gtfs import GTFSMixin, GTFSService
 
 import arrow
+import datetime
 import pytest
 import six
 
@@ -98,3 +99,15 @@ def test_valid_arrivals(provider, time, stop_id, count):
     stop = provider.get(busbus.Stop, stop_id)
     assert (len(list(provider.arrivals.where(stop=stop, start_time=time))) ==
             count)
+
+
+@pytest.mark.parametrize('time,count', [
+    (arrow.get('2007-06-03T06:45:00-07:00'), 6),
+    # becomes 2007-06-02T17:00:00-07:00
+    (datetime.date(2007, 6, 3), 7),
+    # becomes 2007-06-03T06:45:00-07:00
+    (datetime.datetime(2007, 6, 3, 13, 45), 6),
+])
+def test_arrivals_weird_kwargs(provider, time, count):
+    assert (len(list(provider.arrivals.where(
+        stop_id=u'STAGECOACH', route_id=u'STBA', start_time=time))) == count)

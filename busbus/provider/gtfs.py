@@ -323,10 +323,10 @@ class GTFSArrivalQueryable(Queryable):
             kwargs['route'] = provider.get(busbus.Route, route_id)
         for attr in ('start_time', 'end_time'):
             if attr in kwargs:
-                if isinstance(kwargs[attr], datetime.date):
-                    kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
                 if isinstance(kwargs[attr], datetime.datetime):
                     kwargs[attr] = arrow.Arrow.fromdatetime(kwargs[attr])
+                elif isinstance(kwargs[attr], datetime.date):
+                    kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
         it = provider._build_arrivals(**kwargs)
         self.kwargs = kwargs
         super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
