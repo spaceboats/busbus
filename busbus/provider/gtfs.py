@@ -380,7 +380,7 @@ class GTFSMixin(object):
 
     def _build_arrivals(self, **kw):
         start = kw.get('start_time', arrow.now()).to(self._timezone)
-        end = kw.get('end_time', start.replace(hours=3))
+        end = kw.get('end_time', start.replace(hours=3)).to(self._timezone)
         if end <= start:
             return
 
