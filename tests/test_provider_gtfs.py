@@ -28,6 +28,10 @@ def test_provider_with_engine():
     SampleGTFSProvider(busbus.Engine())
 
 
+def test_provider_get_default(provider):
+    assert provider.get(GTFSService, u'The weather in london', None) == None
+
+
 def test_agencies_len(provider):
     assert len(list(provider.agencies)) == 1
 
@@ -111,3 +115,8 @@ def test_valid_arrivals(provider, time, stop_id, count):
 def test_arrivals_weird_kwargs(provider, time, count):
     assert (len(list(provider.arrivals.where(
         stop_id=u'STAGECOACH', route_id=u'STBA', start_time=time))) == count)
+
+
+def test_arrivals_end_before_start(provider):
+    assert (len(list(provider.arrivals.where(
+        end_time=arrow.now().replace(hours=-3)))) == 0)
