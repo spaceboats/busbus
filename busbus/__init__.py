@@ -45,4 +45,10 @@ class Route(BaseEntity):
                  'url', 'color', 'text_color')
 
 
-ENTITIES = (Agency, Stop, Route)
+class Arrival(BaseEntity):
+    __attrs__ = ('route', 'stop', 'time', 'departure_time', 'headsign',
+                 'short_name', 'bikes_ok')
+    __repr_attrs__ = ('route', 'stop', 'time')
+
+
+ENTITIES = (Agency, Stop, Route, Arrival)

@@ -49,3 +49,7 @@ class ProviderBase(object):
     @abstractproperty
     def routes(self):
         """Return an iterator of the routes for this provider"""
+
+    @abstractproperty
+    def arrivals(self):
+        """Return an iterator of the arrivals for this provider"""

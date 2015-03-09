@@ -3,7 +3,7 @@ import collections
 import os
 import six
 
-import busbus
+import busbus.entity
 
 
 @six.add_metaclass(ABCMeta)
@@ -42,12 +42,18 @@ class Config(collections.defaultdict):
 
 
 def entity_type(obj):
-    try:
-        if not isinstance(obj, type):
-            obj = type(obj)
-        return next(x for x in obj.mro() if x in busbus.ENTITIES)
-    except StopIteration:
-        raise TypeError
+    """Return the type just above BaseEntity in method resolution order."""
+    if not isinstance(obj, type):
+        obj = type(obj)
+    mro = obj.mro()
+    if busbus.entity.BaseEntity in mro:
+        index = mro.index(busbus.entity.BaseEntity)
+        if index == 0:
+            raise TypeError(obj)
+        else:
+            return mro[index - 1]
+    else:
+        raise TypeError(obj)
 
 
 def clsname(obj):
