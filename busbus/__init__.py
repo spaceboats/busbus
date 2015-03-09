@@ -14,7 +14,7 @@ class Engine(object):
 
     def __init__(self, config=None):
         self.config = Config(config)
-        self.providers = []
+        self.providers = {}
 
         try:
             os.mkdir(self.config['busbus_dir'])
@@ -23,7 +23,7 @@ class Engine(object):
                 raise
 
     def _register_provider(self, provider):
-        self.providers.append(provider)
+        self.providers[provider._uuid] = provider
 
 
 class Agency(BaseEntity):

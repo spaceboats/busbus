@@ -5,6 +5,7 @@ from cachecontrol import CacheControl
 from cachecontrol.caches import FileCache
 import requests
 import six
+import uuid
 
 
 @six.add_metaclass(ABCMeta)
@@ -15,6 +16,8 @@ class ProviderBase(object):
     poll_interval = 30
 
     def __init__(self, engine):
+        self._uuid = str(uuid.uuid4())
+
         if engine:
             self.engine = engine
         else:
