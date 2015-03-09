@@ -1,4 +1,5 @@
 from busbus.entity import BaseEntity
+from busbus.queryable import Queryable
 from busbus.util import Config
 
 import errno
@@ -24,6 +25,22 @@ class Engine(object):
 
     def _register_provider(self, provider):
         self.providers[provider._uuid] = provider
+
+    @property
+    def agencies(self):
+        return Queryable.chain(*[p.agencies for p in self.providers.values()])
+
+    @property
+    def stops(self):
+        return Queryable.chain(*[p.stops for p in self.providers.values()])
+
+    @property
+    def routes(self):
+        return Queryable.chain(*[p.routes for p in self.providers.values()])
+
+    @property
+    def arrivals(self):
+        return Queryable.chain(*[p.arrivals for p in self.providers.values()])
 
 
 class Agency(BaseEntity):
