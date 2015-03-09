@@ -13,35 +13,45 @@ def test_provider_without_engine():
     SampleGTFSProvider()
 
 
+def test_engine_has_one_provider(engine, provider):
+    assert len(engine._providers) == 1
+
+
 def test_provider_get_default(provider):
     assert provider.get(GTFSService, u'The weather in london', None) == None
 
 
-def test_agencies_len(provider):
-    assert len(list(provider.agencies)) == 1
+entity_len_params = [
+    ('agencies', 1),
+    ('stops', 9),
+    ('routes', 5),
+    # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
+    ('arrivals', 141),
+]
 
 
-def test_stops_len(provider):
-    assert len(list(provider.stops)) == 9
+@pytest.mark.parametrize('attr,count', entity_len_params)
+def test_entity_len_engine(engine, attr, count):
+    assert len(list(getattr(engine, attr))) == count
 
+
+@pytest.mark.parametrize('attr,count', entity_len_params)
+def test_entity_len_provider(provider, attr, count):
+    assert len(list(getattr(provider, attr))) == count
+
+
+def test_stops_etc(provider):
     stop = next(provider.stops)
     # Empty CSV fields should be coerced to None
     assert stop.description is None
     # stops.txt inherits agency timezone if blank
     assert stop.timezone == 'America/Los_Angeles'
 
+
+def test_stops_no_children(provider):
     # none of the stops have children
     for stop in provider.stops:
         assert len(list(stop.children)) == 0
-
-
-def test_routes_len(provider):
-    assert len(list(provider.routes)) == 5
-
-
-def test_arrivals_len(provider):
-    # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
-    assert len(list(provider.arrivals)) == 141
 
 
 def test_agencies_unicode(provider):
