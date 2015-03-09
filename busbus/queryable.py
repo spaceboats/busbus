@@ -1,5 +1,7 @@
 from busbus import util
 
+import itertools
+
 
 class Queryable(util.Iterable):
 
@@ -20,3 +22,23 @@ class Queryable(util.Iterable):
         for k, v in kwargs.items():
             new_funcs.append(lambda obj: getattr(obj, k) == v)
         return Queryable(self.it, self.query_funcs + tuple(new_funcs))
+
+    @staticmethod
+    def chain(*its):
+        return ChainedQueryable(*its)
+
+
+class ChainedQueryable(Queryable):
+
+    def __init__(self, *its):
+        self.its = its
+        self.it = itertools.chain(*its)
+
+    def __next__(self):
+        return next(self.it)
+
+    def where(self, query_func=None, **kwargs):
+        its = []
+        for it in self.its:
+            its.append(it.where(query_func, **kwargs))
+        return ChainedQueryable(*its)

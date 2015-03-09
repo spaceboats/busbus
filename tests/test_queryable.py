@@ -32,3 +32,26 @@ def test_queryable_where_none():
     q = Queryable(range(10))
     q_prime = q.where()
     assert q is q_prime
+
+
+@pytest.fixture(scope='function')
+def qchain():
+    q1 = Queryable(range(10)).where(lambda x: x % 3 == 0)
+    q2 = Queryable(range(10)).where(lambda x: x % 2 == 0)
+    return Queryable.chain(q1, q2)
+
+
+def test_chained_len(qchain):
+    assert len(list(qchain)) == 9
+
+
+def test_chained_set(qchain):
+    assert set(qchain) == set([0, 2, 3, 4, 6, 8, 9])
+
+
+def test_chained_where_len(qchain):
+    assert len(list(qchain.where(lambda x: x % 6 == 0))) == 4
+
+
+def test_chained_where_set(qchain):
+    assert set(qchain.where(lambda x: x % 6 == 0)) == set([0, 6])
