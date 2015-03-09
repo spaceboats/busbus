@@ -327,7 +327,7 @@ class GTFSArrivalQueryable(Queryable):
                     kwargs[attr] = arrow.Arrow.fromdatetime(kwargs[attr])
                 elif isinstance(kwargs[attr], datetime.date):
                     kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
-        it = provider._build_arrivals(**kwargs)
+        it = provider._build_arrivals(kwargs)
         self.kwargs = kwargs
         super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
 
@@ -378,7 +378,7 @@ class GTFSMixin(object):
         if 'id' in cls.__attrs__:
             self._gtfs_id_index[(cls, entity.id)] = entity
 
-    def _build_arrivals(self, **kw):
+    def _build_arrivals(self, kw):
         start = kw.get('start_time', arrow.now()).to(self._timezone)
         end = kw.get('end_time', start.replace(hours=3)).to(self._timezone)
         if end <= start:
