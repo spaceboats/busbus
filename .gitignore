@@ -1,6 +1,9 @@
 # python-rope
 .ropeproject/
 
+# pytest
+.pytest.restart
+
 ### https://github.com/github/gitignore/blob/master/Global/vim.gitignore
 [._]*.s[a-w][a-z]
 [._]s[a-w][a-z]
