@@ -18,6 +18,12 @@ class SampleGTFSProvider(GTFSMixin, ProviderBase):
                     'sample-feed.zip')
         super(SampleGTFSProvider, self).__init__(engine, gtfs_url)
 
+    def _build_arrivals(self, kw):
+        # Set a default start_time that fits within the sample feed's dates
+        if 'start_time' not in kw:
+            kw['start_time'] = arrow.get('2007-06-03T06:45:00-07:00')
+        return super(SampleGTFSProvider, self)._build_arrivals(kw)
+
 
 @pytest.fixture(scope='module')
 def provider():
@@ -119,4 +125,5 @@ def test_arrivals_weird_kwargs(provider, time, count):
 
 def test_arrivals_end_before_start(provider):
     assert (len(list(provider.arrivals.where(
+        start_time=arrow.now(),
         end_time=arrow.now().replace(hours=-3)))) == 0)
