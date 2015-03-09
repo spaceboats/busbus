@@ -15,7 +15,7 @@ class Engine(object):
 
     def __init__(self, config=None):
         self.config = Config(config)
-        self.providers = {}
+        self._providers = {}
 
         try:
             os.mkdir(self.config['busbus_dir'])
@@ -24,23 +24,23 @@ class Engine(object):
                 raise
 
     def _register_provider(self, provider):
-        self.providers[provider._uuid] = provider
+        self._providers[provider._uuid] = provider
 
     @property
     def agencies(self):
-        return Queryable.chain(*[p.agencies for p in self.providers.values()])
+        return Queryable.chain(*[p.agencies for p in self._providers.values()])
 
     @property
     def stops(self):
-        return Queryable.chain(*[p.stops for p in self.providers.values()])
+        return Queryable.chain(*[p.stops for p in self._providers.values()])
 
     @property
     def routes(self):
-        return Queryable.chain(*[p.routes for p in self.providers.values()])
+        return Queryable.chain(*[p.routes for p in self._providers.values()])
 
     @property
     def arrivals(self):
-        return Queryable.chain(*[p.arrivals for p in self.providers.values()])
+        return Queryable.chain(*[p.arrivals for p in self._providers.values()])
 
 
 class Agency(BaseEntity):

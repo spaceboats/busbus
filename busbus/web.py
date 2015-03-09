@@ -23,6 +23,11 @@ class Engine(busbus.Engine):
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def providers(self):
+        return self._providers.keys()
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def agencies(self, **kwargs):
         return self._entity_response('agencies', **kwargs)
 
