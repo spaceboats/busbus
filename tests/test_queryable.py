@@ -14,6 +14,15 @@ def test_queryable_where_func():
         next(q)
 
 
+def test_queryable_where_manyfunc():
+    q = Queryable(range(10)).where(lambda x: x % 2 == 0)
+    q = q.where(lambda x: x % 3 == 0)
+    assert next(q) == 0
+    assert next(q) == 6
+    with pytest.raises(StopIteration):
+        next(q)
+
+
 def test_queryable_where_kwargs(provider):
     q = provider.agencies.where(id='DTA')
     assert len(list(q)) == 1

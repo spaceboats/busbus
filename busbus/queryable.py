@@ -13,8 +13,7 @@ class Queryable(util.Iterable):
     def __next__(self):
         while True:
             value = next(self.it)
-            if not self.query_funcs or \
-                    any(query_func(value) for query_func in self.query_funcs):
+            if all(query_func(value) for query_func in self.query_funcs):
                 return value
 
     def where(self, query_func=None, **kwargs):
