@@ -32,3 +32,8 @@ def test_entity_to_dict(agency):
 def test_entity_to_json(provider):
     json_str = BaseEntityJSONEncoder().encode(next(provider.arrivals))
     json.loads(json_str)
+
+
+def test_bad_json():
+    with pytest.raises(TypeError):
+        BaseEntityJSONEncoder().encode(set())
