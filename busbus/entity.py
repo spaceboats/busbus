@@ -44,6 +44,13 @@ class BaseEntity(object):
         else:
             raise AttributeError(name)
 
-    def to_dict(self):
-        return dict((attr, getattr(self, attr)) for attr in self.__attrs__
-                    if getattr(self, attr) is not None)
+    def __getitem__(self, name):
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            raise KeyError(name)
+
+    def keys(self):
+        for attr in self.__attrs__:
+            if getattr(self, attr):
+                yield attr

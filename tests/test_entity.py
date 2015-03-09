@@ -17,5 +17,10 @@ def test_entity_failed_getattr(agency):
         agency.the_weather_in_london
 
 
+def test_entity_failed_getitem(agency):
+    with pytest.raises(KeyError):
+        agency['the_weather_in_london']
+
+
 def test_entity_to_dict(agency):
-    assert agency.to_dict()['id'] == 'DTA'
+    assert dict(agency)['id'] == 'DTA'
