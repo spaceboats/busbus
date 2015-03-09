@@ -11,10 +11,10 @@ class Engine(object):
     The busbus.Engine manages data providers and allows querying entities and
     subscribing to entity events the providers.
     """
-    providers = []
 
     def __init__(self, config=None):
         self.config = Config(config)
+        self.providers = []
 
         try:
             os.mkdir(self.config['busbus_dir'])
