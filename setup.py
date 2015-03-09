@@ -1,11 +1,27 @@
 from setuptools import setup, find_packages
+import collections
 import os
 
-SETUP_DIR = os.path.dirname(__file__)
+SETUP_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
-def get_requires():
-    with open(os.path.join(SETUP_DIR, 'requirements.txt'), 'r') as f:
+class ExtraRequires(collections.Mapping):
+    suffix = '-requirements.txt'
+
+    def __getitem__(self, key):
+        return get_requires(key + self.suffix)
+
+    def __iter__(self):
+        for filename in os.listdir(SETUP_DIR):
+            if (os.path.isfile(filename) and filename.endswith(self.suffix)):
+                yield filename[:-len(self.suffix)]
+
+    def __len__(self):
+        return sum(1 for _ in self)
+
+
+def get_requires(filename='requirements.txt'):
+    with open(os.path.join(SETUP_DIR, filename), 'r') as f:
         for line in f:
             line = line.strip()
             if line.startswith('#') or not line:
@@ -23,4 +39,5 @@ setup(
     url='https://github.com/spaceboats/busbus',
     packages=find_packages(),
     install_requires=list(get_requires()),
+    extras_require=ExtraRequires(),
 )
