@@ -1,5 +1,6 @@
 from test_provider_gtfs import provider
 
+import busbus
 from busbus.entity import BaseEntityJSONEncoder
 
 import json
@@ -36,4 +37,4 @@ def test_entity_to_json(provider):
 
 def test_bad_json():
     with pytest.raises(TypeError):
-        BaseEntityJSONEncoder().encode(set())
+        BaseEntityJSONEncoder().encode(busbus.Engine)

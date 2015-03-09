@@ -1,6 +1,7 @@
 from busbus import util
 
 import arrow
+import collections
 import json
 
 
@@ -66,4 +67,6 @@ class BaseEntityJSONEncoder(json.JSONEncoder):
             return dict(o)
         elif isinstance(o, arrow.Arrow):
             return o.timestamp
+        elif isinstance(o, collections.Iterable):
+            return list(o)
         return super(BaseEntityJSONEncoder, self).default(o)
