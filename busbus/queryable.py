@@ -5,10 +5,7 @@ class Queryable(util.Iterable):
 
     def __init__(self, it, query_funcs=None):
         self.it = iter(it)
-        if query_funcs:
-            self.query_funcs = tuple(query_funcs)
-        else:
-            self.query_funcs = ()
+        self.query_funcs = tuple(query_funcs) if query_funcs else ()
 
     def __next__(self):
         while True:
