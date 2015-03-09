@@ -1,6 +1,7 @@
+from conftest import SampleGTFSProvider
+
 import busbus
-from busbus.provider import ProviderBase
-from busbus.provider.gtfs import GTFSMixin, GTFSService
+from busbus.provider.gtfs import GTFSService
 
 import arrow
 import datetime
@@ -8,30 +9,8 @@ import pytest
 import six
 
 
-class SampleGTFSProvider(GTFSMixin, ProviderBase):
-
-    def __init__(self, engine=None):
-        # https://developers.google.com/transit/gtfs/examples/gtfs-feed
-        # FIXME We should eventually roll our own GTFS feed as well in order to
-        # test everything
-        gtfs_url = ('https://developers.google.com/transit/gtfs/examples/'
-                    'sample-feed.zip')
-        super(SampleGTFSProvider, self).__init__(engine, gtfs_url)
-
-    def _build_arrivals(self, kw):
-        # Set a default start_time that fits within the sample feed's dates
-        if 'start_time' not in kw:
-            kw['start_time'] = arrow.get('2007-06-03T06:45:00-07:00')
-        return super(SampleGTFSProvider, self)._build_arrivals(kw)
-
-
-@pytest.fixture(scope='module')
-def provider():
-    return SampleGTFSProvider()
-
-
-def test_provider_with_engine():
-    SampleGTFSProvider(busbus.Engine())
+def test_provider_without_engine():
+    SampleGTFSProvider()
 
 
 def test_provider_get_default(provider):
@@ -58,6 +37,11 @@ def test_stops_len(provider):
 
 def test_routes_len(provider):
     assert len(list(provider.routes)) == 5
+
+
+def test_arrivals_len(provider):
+    # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
+    assert len(list(provider.arrivals)) == 141
 
 
 def test_agencies_unicode(provider):

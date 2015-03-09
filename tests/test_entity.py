@@ -1,5 +1,3 @@
-from test_provider_gtfs import provider
-
 import busbus
 from busbus.entity import BaseEntityJSONEncoder
 

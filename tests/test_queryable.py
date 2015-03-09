@@ -1,7 +1,5 @@
 from busbus.queryable import Queryable
 
-from test_provider_gtfs import provider
-
 from six.moves import range
 import pytest
 
