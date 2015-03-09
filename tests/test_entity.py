@@ -1,5 +1,8 @@
 from test_provider_gtfs import provider
 
+from busbus.entity import BaseEntityJSONEncoder
+
+import json
 import pytest
 
 
@@ -24,3 +27,8 @@ def test_entity_failed_getitem(agency):
 
 def test_entity_to_dict(agency):
     assert dict(agency)['id'] == 'DTA'
+
+
+def test_entity_to_json(provider):
+    json_str = BaseEntityJSONEncoder().encode(next(provider.arrivals))
+    json.loads(json_str)

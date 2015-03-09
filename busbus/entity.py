@@ -1,5 +1,8 @@
 from busbus import util
 
+import arrow
+import json
+
 
 class LazyEntityProperty(object):
 
@@ -54,3 +57,13 @@ class BaseEntity(object):
         for attr in self.__attrs__:
             if getattr(self, attr):
                 yield attr
+
+
+class BaseEntityJSONEncoder(json.JSONEncoder):
+
+    def default(self, o):
+        if isinstance(o, BaseEntity):
+            return dict(o)
+        elif isinstance(o, arrow.Arrow):
+            return o.timestamp
+        return super(BaseEntityJSONEncoder, self).default(o)
