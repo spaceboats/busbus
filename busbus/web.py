@@ -18,7 +18,7 @@ class Engine(busbus.Engine):
                 'entity': entity,
                 'params': kwargs,
             },
-            'response': getattr(super(Engine, self), entity).where(**kwargs),
+            entity: getattr(super(Engine, self), entity).where(**kwargs),
         }
 
     @cherrypy.expose
