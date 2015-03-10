@@ -1,3 +1,5 @@
+from __future__ import division
+
 import busbus
 import busbus.entity
 from busbus.queryable import Queryable
@@ -191,13 +193,46 @@ class GTFSStopTime(busbus.entity.BaseEntity):
             pass  # FIXME
         if 'shape_dist_traveled' in data:
             data['shape_dist_traveled'] = float(data['shape_dist_traveled'])
-        if 'exact_times' in data:
+        if 'arrival_time' not in data or data['arrival_time'] is None:
+            data['arrival_time'] = busbus.entity.LazyEntityProperty(
+                self.relative_stop_time, self)
+            data['exact_times'] = 0
+        elif 'exact_times' in data:
             data['exact_times'] = {u'0': False, u'1': True}.get(
                 data['exact_times'], True)
         provider._add_relation(GTFSTrip, data['_trip_id'], 'stop_times', self)
         provider._add_relation(busbus.Stop, data['_stop_id'], 'trips',
                                data['trip'])
         super(GTFSStopTime, self).__init__(provider, **data)
+
+    @staticmethod
+    def relative_stop_time(stop_time):
+        """
+        Calculate stop_time based on shape_dist_traveled (or failing that, how
+        many stops).
+        """
+        all_stops = tuple(stop_time.trip.stop_times)
+        index = all_stops.index(stop_time)
+        for left_index, left in list(enumerate(all_stops))[index-1::-1]:
+            if 'arrival_time' not in left._lazy_properties:
+                break
+        for right_index, right in list(enumerate(all_stops))[index+1:]:
+            if 'arrival_time' not in right._lazy_properties:
+                break
+        time_lr = (right.arrival_time - left.arrival_time).total_seconds()
+        if all(x.shape_dist_traveled is not None
+               for x in (left, stop_time, right)):
+            # use shape_dist_traveled to estimate arrival time
+            dist_lr = right.shape_dist_traveled - left.shape_dist_traveled
+            dist = right.shape_dist_traveled - stop_time.shape_dist_traveled
+            time = (dist / dist_lr) * time_lr
+            return left.arrival_time + datetime.timedelta(seconds=time)
+        else:
+            # use number of stops to estimate arrival time
+            num_lr = right_index - left_index
+            num = right_index - index
+            time = (num / num_lr) * time_lr
+            return left.arrival_time + datetime.timedelta(seconds=time)
 
 
 GTFS_FILENAME_MAP = OrderedDict([
