@@ -20,7 +20,8 @@ class Queryable(util.Iterable):
             return self
         new_funcs = [query_func] if query_func else []
         for k, v in kwargs.items():
-            new_funcs.append(lambda obj: getattr(obj, k) == v)
+            new_funcs.append(lambda obj: (getattr(obj, k) == v
+                                          if hasattr(obj, k) else False))
         return Queryable(self.it, self.query_funcs + tuple(new_funcs))
 
     @staticmethod
