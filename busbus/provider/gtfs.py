@@ -415,8 +415,9 @@ class GTFSMixin(object):
             self._gtfs_id_index[(cls, entity.id)] = entity
 
     def _build_arrivals(self, kw):
-        start = kw.get('start_time', arrow.now()).to(self._timezone)
-        end = kw.get('end_time', start.replace(hours=3)).to(self._timezone)
+        start = arrow.get(kw.get('start_time', arrow.now())).to(self._timezone)
+        end = arrow.get(kw.get('end_time',
+                               start.replace(hours=3))).to(self._timezone)
         if end <= start:
             return
 
