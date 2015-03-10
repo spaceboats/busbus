@@ -351,11 +351,11 @@ class GTFSArrivalQueryable(Queryable):
 
     def __init__(self, provider, query_funcs=None, **kwargs):
         self.provider = provider
-        if 'stop_id' in kwargs:
-            stop_id = kwargs.pop('stop_id')
+        if 'stop.id' in kwargs:
+            stop_id = kwargs.pop('stop.id')
             kwargs['stop'] = provider.get(busbus.Stop, stop_id)
-        if 'route_id' in kwargs:
-            route_id = kwargs.pop('route_id')
+        if 'route.id' in kwargs:
+            route_id = kwargs.pop('route.id')
             kwargs['route'] = provider.get(busbus.Route, route_id)
         for attr in ('start_time', 'end_time'):
             if attr in kwargs:

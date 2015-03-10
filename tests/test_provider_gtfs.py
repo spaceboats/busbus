@@ -113,8 +113,10 @@ def test_valid_arrivals(provider, time, stop_id, count):
     (datetime.datetime(2007, 6, 3, 13, 45), 6),
 ])
 def test_arrivals_weird_kwargs(provider, time, count):
-    assert (len(list(provider.arrivals.where(
-        stop_id=u'STAGECOACH', route_id=u'STBA', start_time=time))) == count)
+    stop = provider.get(busbus.Stop, u'STAGECOACH')
+    route = provider.get(busbus.Route, u'STBA')
+    assert (len(list(provider.arrivals.where(stop=stop, route=route,
+                                             start_time=time))) == count)
 
 
 def test_arrivals_end_before_start(provider):

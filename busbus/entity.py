@@ -45,8 +45,9 @@ class BaseEntity(object):
             del self._lazy_properties[name]
             setattr(self, name, value)
             return value
-        else:
-            raise AttributeError(name)
+        if '.' in name:  # nested attribute
+            return reduce(getattr, name.split('.'), self)
+        raise AttributeError(name)
 
     def __getitem__(self, name):
         try:
