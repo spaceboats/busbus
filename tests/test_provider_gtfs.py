@@ -66,9 +66,8 @@ def test_agencies_unicode(provider):
 
 def test_stops_latlon(provider):
     for stop in provider.stops:
-        assert len(stop.location) == 2
-        assert isinstance(stop.location[0], float)
-        assert isinstance(stop.location[1], float)
+        assert isinstance(stop.latitude, float)
+        assert isinstance(stop.longitude, float)
 
 
 def test_routes_agency(provider):

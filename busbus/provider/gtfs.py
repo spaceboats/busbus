@@ -54,8 +54,8 @@ class GTFSStop(busbus.Stop):
     def __init__(self, provider, **data):
         if '_lat' in data and '_lon' in data:
             try:
-                data['location'] = (float(data['_lat']),
-                                    float(data['_lon']))
+                data['latitude'] = float(data['_lat'])
+                data['longitude'] = float(data['_lon'])
             except ValueError:
                 data['location'] = None
         if '_zone_id' in data:

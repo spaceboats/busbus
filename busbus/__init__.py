@@ -49,8 +49,8 @@ class Agency(BaseEntity):
 
 
 class Stop(BaseEntity):
-    __attrs__ = ('id', 'code', 'name', 'description', 'location', 'zone',
-                 'url', 'parent', 'timezone', 'accessible')
+    __attrs__ = ('id', 'code', 'name', 'description', 'latitude', 'longitude',
+                 'zone', 'url', 'parent', 'timezone', 'accessible')
 
     @property
     def children(self):
