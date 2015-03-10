@@ -176,6 +176,7 @@ class GTFSStopTime(busbus.entity.BaseEntity):
     __attrs__ = ('trip', 'stop', 'arrival_time', 'departure_time', 'sequence',
                  'headsign', 'pickup', 'dropoff', 'shape_dist_traveled',
                  'exact_times')
+    __repr_attrs__ = ('trip', 'stop', 'arrival_time')
 
     def __init__(self, provider, **data):
         data['trip'] = provider.get(GTFSTrip, data['_trip_id'])
