@@ -59,18 +59,15 @@ class BaseEntity(object):
     def keys(self):
         yield 'provider'
         for attr in self.__attrs__:
-            if getattr(self, attr):
+            if getattr(self, attr, None) is not None:
                 yield attr
 
 
 class BaseEntityJSONEncoder(json.JSONEncoder):
 
     def default(self, o):
-        if isinstance(o, BaseEntity):
+        if isinstance(o, (BaseEntity, busbus.provider.ProviderBase)):
             return dict(o)
-        elif isinstance(o, busbus.provider.ProviderBase):
-            keys = ('id', 'legal', 'credit', 'credit_url', 'country')
-            return dict((k, getattr(o, k)) for k in keys if hasattr(o, k))
         elif isinstance(o, arrow.Arrow):
             return o.timestamp
         elif isinstance(o, collections.Iterable):

@@ -60,3 +60,14 @@ class ProviderBase(object):
     @abstractproperty
     def arrivals(self):
         """Return an iterator of the arrivals for this provider"""
+
+    def __getitem__(self, name):
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            raise KeyError(name)
+
+    def keys(self):
+        for attr in ('id', 'legal', 'credit', 'credit_url', 'country'):
+            if getattr(self, attr, None) is not None:
+                yield attr

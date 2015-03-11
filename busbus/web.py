@@ -1,14 +1,49 @@
 import busbus
 from busbus.entity import BaseEntityJSONEncoder
+from busbus.provider import ProviderBase
 
 import cherrypy
+import collections
+import itertools
 import math
+import types
 
 
 def json_handler(*args, **kwargs):
     value = cherrypy.serving.request._json_inner_handler(*args, **kwargs)
     return BaseEntityJSONEncoder().encode(value).encode('utf-8')
 cherrypy.config['tools.json_out.handler'] = json_handler
+
+
+EXPAND_TYPES = {
+    'providers': ProviderBase,
+    'agencies': busbus.Agency,
+    'stops': busbus.Stop,
+    'routes': busbus.Route,
+    'arrivals': busbus.Arrival,
+}
+
+
+def unexpand_init(result, to_expand):
+    return ({attr: unexpand(value, to_expand)
+             for attr, value in dict(obj).items()}
+            for obj in result)
+
+
+def unexpand(obj, to_expand):
+    for name, cls in EXPAND_TYPES.items():
+        if isinstance(obj, cls):
+            if name not in to_expand:
+                return {'id': obj.id}
+            else:
+                return {attr: unexpand(value, to_expand)
+                        for attr, value in dict(obj).items()}
+    if isinstance(obj, dict):
+        return {attr: unexpand(value, to_expand)
+                for attr, value in obj.items()}
+    if isinstance(obj, (list, tuple, collections.Iterator)):
+        return (unexpand(value, to_expand) for value in obj)
+    return obj
 
 
 class APIError(Exception):
@@ -36,16 +71,20 @@ class Engine(busbus.Engine):
                 'params': kwargs,
             }
         }
+        to_expand = (kwargs.pop('_expand').split(',')
+                     if '_expand' in kwargs else [])
+        if to_expand:
+            response['request']['expand'] = to_expand
         if action:
             response['request']['action'] = action
             try:
-                func = self._entity_actions[(entity, action)]
-                response[entity] = func(**kwargs)
+                func, entity = self._entity_actions[(entity, action)]
+                response[entity] = unexpand_init(func(**kwargs), to_expand)
             except APIError as exc:
                 response['error'] = exc.msg
         else:
-            response[entity] = (getattr(super(Engine, self), entity)
-                                .where(**kwargs))
+            result = getattr(super(Engine, self), entity).where(**kwargs)
+            response[entity] = unexpand_init(result, to_expand)
         return response
 
     def stops_find(self, **kwargs):
