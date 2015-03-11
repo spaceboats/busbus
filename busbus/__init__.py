@@ -24,7 +24,11 @@ class Engine(object):
                 raise
 
     def _register_provider(self, provider):
-        self._providers[provider._uuid] = provider
+        self._providers[provider.id] = provider
+
+    @property
+    def providers(self):
+        return Queryable(self._providers.values())
 
     @property
     def agencies(self):

@@ -74,11 +74,11 @@ class GTFSStop(busbus.Stop):
 
     @property
     def children(self):
-        return Queryable(self._provider._get_relation(self, 'children'))
+        return Queryable(self.provider._get_relation(self, 'children'))
 
     @property
     def _trips(self):
-        return Queryable(self._provider._get_relation(self, 'trips'))
+        return Queryable(self.provider._get_relation(self, 'trips'))
 
 
 class GTFSRoute(busbus.Route):
@@ -147,13 +147,13 @@ class GTFSTrip(busbus.entity.BaseEntity):
     @property
     def frequencies(self):
         return Queryable(sorted(
-            self._provider._get_relation(self, 'frequencies'),
+            self.provider._get_relation(self, 'frequencies'),
             key=operator.attrgetter('start_time')))
 
     @property
     def stop_times(self):
         return Queryable(sorted(
-            self._provider._get_relation(self, 'stop_times'),
+            self.provider._get_relation(self, 'stop_times'),
             key=operator.attrgetter('sequence')))
 
 

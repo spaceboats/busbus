@@ -1,8 +1,10 @@
 import busbus
+from busbus.util import clsname
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from cachecontrol import CacheControl
 from cachecontrol.caches import FileCache
+import hashlib
 import requests
 import six
 import uuid
@@ -15,8 +17,10 @@ class ProviderBase(object):
     # a minimum polling interval. Defaults to 30 seconds.
     poll_interval = 30
 
-    def __init__(self, engine):
-        self._uuid = str(uuid.uuid4())
+    def __init__(self, engine, **kwargs):
+        self.id = hashlib.sha1(six.b(
+            '{0}:{1!r}'.format(clsname(self), kwargs.get('__init_args__', {}))
+        )).hexdigest()
 
         if engine:
             self.engine = engine

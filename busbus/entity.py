@@ -1,3 +1,4 @@
+import busbus.provider
 from busbus import util
 
 import arrow
@@ -21,7 +22,7 @@ class BaseEntity(object):
     __derived__ = False
 
     def __init__(self, provider, **kwargs):
-        self._provider = provider
+        self.provider = provider
         self._lazy_properties = {}
 
         for attr in getattr(self, '__attrs__', []):
@@ -56,6 +57,7 @@ class BaseEntity(object):
             raise KeyError(name)
 
     def keys(self):
+        yield 'provider'
         for attr in self.__attrs__:
             if getattr(self, attr):
                 yield attr
@@ -66,6 +68,9 @@ class BaseEntityJSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, BaseEntity):
             return dict(o)
+        elif isinstance(o, busbus.provider.ProviderBase):
+            keys = ('id', 'legal', 'credit', 'credit_url', 'country')
+            return dict((k, getattr(o, k)) for k in keys if hasattr(o, k))
         elif isinstance(o, arrow.Arrow):
             return o.timestamp
         elif isinstance(o, collections.Iterable):
