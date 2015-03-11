@@ -91,6 +91,23 @@ class GTFSRoute(busbus.Route):
 
         super(GTFSRoute, self).__init__(provider, **data)
 
+    @property
+    def directions(route):
+        hashes = []
+        for trip in route.provider._get_relation(route, 'trips'):
+            direction = {'stops': [stop_time.stop for stop_time
+                                   in trip.stop_times]}
+            if trip.headsign is not None:
+                direction['headsign'] = trip.headsign
+            if trip.short_name is not None:
+                direction['short_name'] = trip.short_name
+            if trip.bikes_ok is not None:
+                direction['bikes_ok'] = trip.bikes_ok
+            h = util.freezehash(direction)
+            if h not in hashes:
+                hashes.append(h)
+                yield direction
+
 
 class GTFSArrival(busbus.Arrival):
     __derived__ = True
@@ -142,6 +159,7 @@ class GTFSTrip(busbus.entity.BaseEntity):
         if '_bikes' in data:
             data['bikes_ok'] = {u'0': None, u'1': True,
                                 u'2': False}[data['_bikes']]
+        provider._add_relation(GTFSRoute, data['_route_id'], 'trips', self)
         super(GTFSTrip, self).__init__(provider, **data)
 
     @property

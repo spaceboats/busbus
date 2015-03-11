@@ -57,7 +57,8 @@ class Engine(busbus.Engine):
     def __init__(self, *args, **kwargs):
         # perhaps fix this to use a decorator somehow?
         self._entity_actions = {
-            ('stops', 'find'): self.stops_find
+            ('stops', 'find'): (self.stops_find, 'stops'),
+            ('routes', 'directions'): (self.routes_directions, 'directions'),
         }
         super(Engine, self).__init__(*args, **kwargs)
 
@@ -106,3 +107,12 @@ class Engine(busbus.Engine):
         else:
             raise APIError('missing attributes: ' + ','.join(
                 x for x in expected if x not in kwargs))
+
+    def routes_directions(self, **kwargs):
+        expected = ('route.id', 'provider.id')
+        missing = [x for x in expected if x not in kwargs]
+        if missing:
+            raise APIError('missing attributes: ' + ','.join(missing))
+        provider = self._providers[kwargs['provider.id']]
+        route = provider.get(busbus.Route, kwargs['route.id'])
+        return route.directions
