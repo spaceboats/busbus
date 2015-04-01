@@ -85,6 +85,9 @@ class Engine(busbus.Engine):
                 response['error'] = exc.msg
         else:
             result = getattr(super(Engine, self), entity).where(**kwargs)
+            if '_limit' in kwargs:
+                limit = int(kwargs['_limit'])
+                result = itertools.islice(result, limit)
             response[entity] = unexpand_init(result, to_expand)
         return response
 
