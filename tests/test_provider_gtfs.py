@@ -1,4 +1,4 @@
-from conftest import SampleGTFSProvider
+from .conftest import SampleGTFSProvider
 
 import busbus
 from busbus.provider.gtfs import GTFSService
