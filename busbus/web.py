@@ -65,9 +65,13 @@ class Engine(busbus.Engine):
     @cherrypy.popargs('entity', 'action')
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def default(self, entity, action=None, **kwargs):
+    def default(self, entity=None, action=None, **kwargs):
+        if entity is None:
+            return self.help()
+
         response = {
             'request': {
+                'status': 'ok',
                 'entity': entity,
                 'params': kwargs,
             }
@@ -78,18 +82,40 @@ class Engine(busbus.Engine):
             response['request']['expand'] = to_expand
         if action:
             response['request']['action'] = action
-            try:
+            if (entity, action) in self._entity_actions:
                 func, entity = self._entity_actions[(entity, action)]
-                response[entity] = unexpand_init(func(**kwargs), to_expand)
-            except APIError as exc:
-                response['error'] = exc.msg
+                try:
+                    response[entity] = unexpand_init(func(**kwargs), to_expand)
+                except APIError as exc:
+                    response['request']['status'] = 'error'
+                    response['error'] = exc.msg
+                    cherrypy.response.status = 500
+                return response
         else:
-            result = getattr(super(Engine, self), entity).where(**kwargs)
-            if '_limit' in kwargs:
-                limit = int(kwargs['_limit'])
-                result = itertools.islice(result, limit)
-            response[entity] = unexpand_init(result, to_expand)
+            entity_func = getattr(super(Engine, self), entity, None)
+            if entity_func is not None:
+                result = getattr(super(Engine, self), entity).where(**kwargs)
+                if '_limit' in kwargs:
+                    limit = int(kwargs['_limit'])
+                    result = itertools.islice(result, limit)
+                response[entity] = unexpand_init(result, to_expand)
+                return response
+
+        # if we get here, endpoint was not found
+        response['request']['status'] = 'error'
+        response['error'] = 'Endpoint /{0} not found'.format(
+            entity + '/' + action if action else entity)
+        cherrypy.response.status = 404
         return response
+
+    def help(self):
+        return {
+            'request': {
+                'status': 'help',
+            },
+            '_entities': EXPAND_TYPES.keys(),
+            '_actions': self._entity_actions.keys(),
+        }
 
     def stops_find(self, **kwargs):
         def dist(lat1, lon1, lat2, lon2):

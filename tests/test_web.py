@@ -32,3 +32,30 @@ def url_prefix(request):
         cherrypy.engine.exit()
 
     return 'http://{0}:{1}/'.format(host, port)
+
+
+def get(url, status_code=200):
+    resp = requests.get(url)
+    assert resp.status_code == status_code
+    assert resp.headers['content-type'] == 'application/json'
+    data = resp.json()
+    assert 'request' in data
+    assert 'status' in data['request']
+    assert data['request']['status'] in (('error',) if status_code == 404
+                                         else ('ok', 'help'))
+    return (data, resp)
+
+
+def test_index(url_prefix):
+    data, resp = get(url_prefix)
+    assert data['request']['status'] == 'help'
+    for attr in ('_entities', '_actions'):
+        assert isinstance(data.get(attr, None), list)
+
+
+def test_invalid_entity(url_prefix):
+    get(url_prefix + 'invalid_entity', 404)
+
+
+def test_invalid_action(url_prefix):
+    get(url_prefix + 'providers/invalid_action', 404)
