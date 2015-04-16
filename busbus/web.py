@@ -48,8 +48,9 @@ def unexpand(obj, to_expand):
 
 class APIError(Exception):
 
-    def __init__(self, msg):
+    def __init__(self, msg, error_code=500):
         self.msg = msg
+        self.error_code = error_code
 
 
 class Engine(busbus.Engine):
@@ -89,14 +90,16 @@ class Engine(busbus.Engine):
                 except APIError as exc:
                     response['request']['status'] = 'error'
                     response['error'] = exc.msg
-                    cherrypy.response.status = 500
+                    cherrypy.response.status = exc.error_code
                 return response
         else:
             entity_func = getattr(super(Engine, self), entity, None)
             if entity_func is not None:
-                result = getattr(super(Engine, self), entity).where(**kwargs)
                 if '_limit' in kwargs:
-                    limit = int(kwargs['_limit'])
+                    limit = int(kwargs.pop('_limit'))
+                    response['request']['limit'] = limit
+                result = getattr(super(Engine, self), entity).where(**kwargs)
+                if 'limit' in response['request']:
                     result = itertools.islice(result, limit)
                 response[entity] = unexpand_init(result, to_expand)
                 return response
@@ -119,6 +122,10 @@ class Engine(busbus.Engine):
 
     def stops_find(self, **kwargs):
         def dist(lat1, lon1, lat2, lon2):
+            """
+            Returns the distance between two latitude/longitude pairs in
+            meters.
+            """
             lat1, lon1, lat2, lon2 = map(math.radians,
                                          (lat1, lon1, lat2, lon2))
             return math.acos(math.sin(lat1) * math.sin(lat2) +
@@ -135,13 +142,13 @@ class Engine(busbus.Engine):
                            kwargs['distance']))
         else:
             raise APIError('missing attributes: ' + ','.join(
-                x for x in expected if x not in kwargs))
+                x for x in expected if x not in kwargs), 422)
 
     def routes_directions(self, **kwargs):
         expected = ('route.id', 'provider.id')
         missing = [x for x in expected if x not in kwargs]
         if missing:
-            raise APIError('missing attributes: ' + ','.join(missing))
+            raise APIError('missing attributes: ' + ','.join(missing), 422)
         provider = self._providers[kwargs['provider.id']]
         route = provider.get(busbus.Route, kwargs['route.id'])
         return route.directions

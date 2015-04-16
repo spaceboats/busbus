@@ -34,14 +34,20 @@ def url_prefix(request):
     return 'http://{0}:{1}/'.format(host, port)
 
 
-def get(url, status_code=200):
+@pytest.fixture(scope='module')
+def provider_id(url_prefix):
+    data, resp = get(url_prefix + 'providers')
+    return data['providers'][0]['id']
+
+
+def get(url, code=200):
     resp = requests.get(url)
-    assert resp.status_code == status_code
+    assert resp.status_code == code
     assert resp.headers['content-type'] == 'application/json'
     data = resp.json()
     assert 'request' in data
     assert 'status' in data['request']
-    assert data['request']['status'] in (('error',) if status_code == 404
+    assert data['request']['status'] in (('error',) if code // 100 == 4
                                          else ('ok', 'help'))
     return (data, resp)
 
@@ -59,3 +65,47 @@ def test_invalid_entity(url_prefix):
 
 def test_invalid_action(url_prefix):
     get(url_prefix + 'providers/invalid_action', 404)
+
+
+def test_query(url_prefix):
+    data, resp = get(url_prefix + 'stops')
+    assert 'stops' in data
+    assert len(data['stops']) == 9
+
+
+def test_unexpand_none(url_prefix):
+    data, resp = get(url_prefix + 'routes')
+    assert set(data['routes'][0]['agency'].keys()) == set(['id'])
+
+
+def test_unexpand_agencies(url_prefix):
+    data, resp = get(url_prefix + 'routes?_expand=agencies')
+    assert 'timezone' in data['routes'][0]['agency']
+
+
+def test_limit(url_prefix):
+    data, resp = get(url_prefix + 'routes?_limit=1')
+    assert len(data['routes']) == 1
+
+
+def test_stops_find(url_prefix):
+    data, resp = get(url_prefix + ('stops/find?latitude=36.914778&'
+                                   'longitude=-116.767900&distance=100'))
+    assert len(data['stops']) == 1
+    assert data['stops'][0]['id'] == 'NADAV'
+
+
+def test_stops_find_missing_attrs(url_prefix):
+    data, resp = get(url_prefix + 'stops/find', 422)
+    assert data['error'].startswith('missing attributes')
+
+
+def test_routes_directions(url_prefix, provider_id):
+    data, resp = get(url_prefix + ('routes/directions?route.id=AB&'
+                                   'provider.id={0}'.format(provider_id)))
+    assert len(data['directions']) == 2
+
+
+def test_routes_directions_missing_attrs(url_prefix):
+    data, resp = get(url_prefix + 'routes/directions', 422)
+    assert data['error'].startswith('missing attributes')
