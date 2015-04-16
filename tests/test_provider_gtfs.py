@@ -116,6 +116,10 @@ def test_arrivals_weird_kwargs(provider, time, count):
     route = provider.get(busbus.Route, u'STBA')
     assert (len(list(provider.arrivals.where(stop=stop, route=route,
                                              start_time=time))) == count)
+    # test dotted kwargs
+    assert (len(list(provider.arrivals.where(
+        **{'stop.id': u'STAGECOACH', 'route.id': u'STBA', 'start_time': time}
+    ))) == count)
 
 
 def test_arrivals_end_before_start(provider):

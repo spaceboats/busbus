@@ -24,6 +24,16 @@ def test_entity_failed_getitem(agency):
         agency['the_weather_in_london']
 
 
+def test_provider_failed_getattr(provider):
+    with pytest.raises(AttributeError):
+        provider.the_weather_in_london
+
+
+def test_provider_failed_getitem(provider):
+    with pytest.raises(KeyError):
+        provider['the_weather_in_london']
+
+
 def test_entity_to_dict(agency):
     assert dict(agency)['id'] == 'DTA'
 
