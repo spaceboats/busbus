@@ -16,7 +16,8 @@ def url_prefix(request):
 
     # https://cherrypy.readthedocs.org/en/latest/deploy.html
     # § Embedding into another WSGI framework
-    cherrypy.config.update({'environment': 'embedded'})
+    cherrypy.config.update({'environment': 'embedded',
+                            'global': {'request.throw_errors': True}})
     cherrypy.server.unsubscribe()  # disables built-in HTTP server
     cherrypy.engine.start()
 
