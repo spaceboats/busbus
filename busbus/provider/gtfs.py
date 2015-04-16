@@ -7,13 +7,22 @@ from busbus import util
 import busbus.util.csv as utilcsv
 
 import arrow
+import codecs
 from collections import OrderedDict
 import datetime
+import hashlib
 import itertools
 import operator
+import os
 import phonenumbers
+from pkg_resources import resource_string
 import six
+import sqlite3
 import zipfile
+
+
+# This must be the same as the user_version pragma in gtfs.sql
+SCHEMA_USER_VERSION = 2015020201
 
 
 def parse_gtfs_time(timestr):
@@ -33,6 +42,20 @@ def parse_gtfs_time(timestr):
     split = [0] * (3 - len(split)) + split
     return datetime.timedelta(hours=split[0] - 12, minutes=split[1],
                               seconds=split[2])
+
+
+def fix_type(value, typename):
+    return {
+        'date': lambda s: arrow.get(s, 'YYYYMMDD').date(),
+        'gtfstime': lambda s: parse_gtfs_time(s).total_seconds(),
+        'integer': int,
+        'real': float,
+        'timedelta': int,
+    }.get(typename, lambda s: s)(value) if value else None
+
+
+sqlite3.register_converter('gtfstime', lambda s: datetime.timedelta(int(s)))
+sqlite3.register_converter('timedelta', lambda s: datetime.timedelta(int(s)))
 
 
 class GTFSAgency(busbus.Agency):
@@ -402,35 +425,69 @@ class GTFSMixin(object):
 
     def __init__(self, engine, gtfs_url):
         super(GTFSMixin, self).__init__(engine)
-        self._gtfs_entities = {e: list() for e in busbus.ENTITIES}
-        self._gtfs_id_index = {}
-        self._gtfs_rel_index = {}
 
+        db_path = self.engine.config.get(
+            'gtfs_db_path',
+            os.path.join(self.engine.config['busbus_dir'], 'gtfs.sqlite3'))
+        self.conn = sqlite3.connect(db_path, isolation_level='DEFERRED',
+                                    detect_types=(sqlite3.PARSE_DECLTYPES |
+                                                  sqlite3.PARSE_COLNAMES))
+
+        version = self.conn.execute('pragma user_version').fetchone()[0]
+        if version == 0:
+            script = resource_string(
+                __name__, 'gtfs_{0}.sql'.format(SCHEMA_USER_VERSION))
+            if isinstance(script, six.binary_type):
+                script = script.decode('utf-8')
+            self.conn.executescript(script)
+        elif version < SCHEMA_USER_VERSION:
+            raise NotImplementedError()
+        elif version > SCHEMA_USER_VERSION:
+            raise RuntimeError('Database version is {0}, but only version {1} '
+                               'is known'.format(version, SCHEMA_USER_VERSION))
+
+        tables = [r[0] for r in self.conn.execute('SELECT name FROM '
+                                                  'sqlite_master WHERE '
+                                                  'type="table"')
+                  if not r[0].startswith('_')]
+
+        if isinstance(gtfs_url, six.binary_type):
+            gtfs_url = gtfs_url.decode('utf-8')
         resp = self._cached_requests.get(gtfs_url)
+        zip = six.BytesIO(resp.content).getvalue()
+        hash = hashlib.sha256(zip).hexdigest()
 
-        with zipfile.ZipFile(six.BytesIO(resp.content)) as z:
-            for filename, mapping in GTFS_FILENAME_MAP.items():
-                with z.open(filename) as f:
-                    dataset = (self._rewrite(data, mapping['rewriter'])
-                               for data in utilcsv.CSVReader(f))
-                    if 'class' in mapping:
-                        cls = mapping['class']
-                        basecls = util.entity_type(cls)
-                        self._gtfs_entities[basecls] = [cls(self, **data)
-                                                        for data in dataset]
-                    elif 'function' in mapping:
-                        for data in dataset:
-                            mapping['function'](self, **data)
+        count = (self.conn.execute('SELECT count(*) FROM _feeds WHERE '
+                                   'url=? AND sha256sum=?', (gtfs_url, hash))
+                 .fetchone()[0])
+        if count != 1:
+            self.conn.execute('DELETE FROM _feeds WHERE url=?', (gtfs_url,))
+            for table in tables:
+                self.conn.execute(
+                    'DELETE FROM {0} WHERE _feed_url=?'.format(table),
+                    (gtfs_url,))
+            self.conn.execute('INSERT INTO _feeds (url, sha256sum) '
+                              'VALUES (?, ?)', (gtfs_url, hash))
+            with zipfile.ZipFile(six.BytesIO(zip)) as z:
+                for table in tables:
+                    filename = table + '.txt'
+                    if filename not in z.namelist():
+                        continue
+                    with z.open(filename) as f:
+                        data = six.moves.map(lambda d: dict(itertools.chain(d, [(u'_feed_url', gtfs_url)])), utilcsv.CSVReader(f))
+                        columns = {x[1]: x[2] for x in self.conn.execute(
+                            'pragma table_info({0})'.format(table))}
+                        stmt = ('INSERT INTO {0} ({1}) VALUES ({2})'
+                                .format(table, ', '.join(columns),
+                                        ', '.join(':' + c for c in columns)))
+                        self.conn.executemany(
+                            stmt, ({k: fix_type(row.get(k), columns[k])
+                                    for k in columns} for row in data))
 
-    @staticmethod
-    def _rewrite(data, rewriter):
-        return {rewriter[col]: datum for col, datum in data
-                if len(datum) > 0 and col in rewriter}
+        self.conn.commit()
 
-    def _new_entity(self, entity):
-        cls = util.entity_type(entity)
-        if 'id' in cls.__attrs__:
-            self._gtfs_id_index[(cls, entity.id)] = entity
+    def __del__(self):
+        self.conn.close()
 
     def _build_arrivals(self, kw):
         start = arrow.get(kw.get('start_time', arrow.now())).to(self._timezone)
@@ -487,21 +544,6 @@ class GTFSMixin(object):
                                                         stop_time)
                                 if arrival:
                                     yield arrival
-
-    def _add_relation(self, cls, id, relation, other):
-        rel = (util.entity_type(cls), relation)
-        if rel not in self._gtfs_rel_index:
-            self._gtfs_rel_index[rel] = {}
-        if id not in self._gtfs_rel_index[rel]:
-            self._gtfs_rel_index[rel][id] = set()
-        self._gtfs_rel_index[rel][id].add(other)
-
-    def _get_relation(self, obj, relation):
-        rel = (util.entity_type(obj), relation)
-        if rel in self._gtfs_rel_index:
-            return self._gtfs_rel_index[rel].get(obj.id, [])
-        else:
-            return []
 
     def get(self, cls, id, default=None):
         try:
