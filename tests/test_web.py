@@ -94,6 +94,17 @@ def test_limit(url_prefix):
     assert len(data['routes']) == 1
 
 
+def test_invalid_limit(url_prefix):
+    get(url_prefix + 'routes?_limit=-422', 422)
+
+
+def test_limit_on_action(url_prefix):
+    data, resp = get(url_prefix + ('stops/find?latitude=36.914778&'
+                                   'longitude=-116.767900&distance=10000&'
+                                   '_limit=1'))
+    assert len(data['stops']) == 1
+
+
 def test_stops_find(url_prefix):
     data, resp = get(url_prefix + ('stops/find?latitude=36.914778&'
                                    'longitude=-116.767900&distance=100'))

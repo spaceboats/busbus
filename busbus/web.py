@@ -53,6 +53,14 @@ class APIError(Exception):
         self.error_code = error_code
 
 
+class EndpointNotFoundError(APIError):
+
+    def __init__(self, entity, action=None):
+        super(EndpointNotFoundError, self).__init__(
+            'Endpoint /{0} not found'.format(
+                entity + '/' + action if action else entity), 404)
+
+
 class Engine(busbus.Engine):
 
     def __init__(self, *args, **kwargs):
@@ -77,38 +85,46 @@ class Engine(busbus.Engine):
                 'params': kwargs,
             }
         }
-        to_expand = (kwargs.pop('_expand').split(',')
-                     if '_expand' in kwargs else [])
-        if to_expand:
-            response['request']['expand'] = to_expand
-        if action:
-            response['request']['action'] = action
-            if (entity, action) in self._entity_actions:
-                func, entity = self._entity_actions[(entity, action)]
-                try:
-                    response[entity] = unexpand_init(func(**kwargs), to_expand)
-                except APIError as exc:
-                    response['request']['status'] = 'error'
-                    response['error'] = exc.msg
-                    cherrypy.response.status = exc.error_code
-                return response
-        else:
-            entity_func = getattr(super(Engine, self), entity, None)
-            if entity_func is not None:
-                if '_limit' in kwargs:
-                    limit = int(kwargs.pop('_limit'))
-                    response['request']['limit'] = limit
-                result = getattr(super(Engine, self), entity).where(**kwargs)
-                if 'limit' in response['request']:
-                    result = itertools.islice(result, limit)
-                response[entity] = unexpand_init(result, to_expand)
-                return response
 
-        # if we get here, endpoint was not found
-        response['request']['status'] = 'error'
-        response['error'] = 'Endpoint /{0} not found'.format(
-            entity + '/' + action if action else entity)
-        cherrypy.response.status = 404
+        try:
+            to_expand = (kwargs.pop('_expand').split(',')
+                         if '_expand' in kwargs else [])
+            if to_expand:
+                response['request']['expand'] = to_expand
+
+            limit = kwargs.pop('_limit', None)
+            if limit:
+                try:
+                    limit = int(limit)
+                    if limit <= 0:
+                        raise ValueError()
+                except ValueError:
+                    raise APIError('_limit must be a positive integer', 422)
+                response['request']['limit'] = limit
+
+            if action:
+                response['request']['action'] = action
+                if (entity, action) in self._entity_actions:
+                    func, entity = self._entity_actions[(entity, action)]
+                    result = func(**kwargs)
+                else:
+                    raise EndpointNotFoundError(entity, action)
+            else:
+                entity_func = getattr(self, entity, None)
+                if entity_func is not None:
+                    result = entity_func.where(**kwargs)
+                else:
+                    raise EndpointNotFoundError(entity)
+
+            if limit:
+                result = itertools.islice(result, limit)
+
+            response[entity] = unexpand_init(result, to_expand)
+        except APIError as exc:
+            response['request']['status'] = 'error'
+            response['error'] = exc.msg
+            cherrypy.response.status = exc.error_code
+
         return response
 
     def help(self):
