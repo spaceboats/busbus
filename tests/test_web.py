@@ -67,6 +67,11 @@ def test_invalid_action(url_prefix):
     get(url_prefix + 'providers/invalid_action', 404)
 
 
+def test_nested(url_prefix, provider_id):
+    data, resp = get(url_prefix + 'routes?provider.id={0}'.format(provider_id))
+    assert data['routes']
+
+
 def test_query(url_prefix):
     data, resp = get(url_prefix + 'stops')
     assert 'stops' in data

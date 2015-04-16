@@ -4,6 +4,7 @@ from busbus import util
 import arrow
 import collections
 import json
+from six.moves import reduce
 
 
 class LazyEntityProperty(object):
