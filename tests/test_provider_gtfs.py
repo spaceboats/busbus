@@ -1,9 +1,10 @@
 from .conftest import SampleGTFSProvider
 
 import busbus
-from busbus.provider.gtfs import GTFSService
+from busbus.provider.gtfs import SQLEntityMixin
 
 import arrow
+from collections import OrderedDict
 import datetime
 import pytest
 import six
@@ -18,7 +19,32 @@ def test_engine_has_one_provider(engine, provider):
 
 
 def test_provider_get_default(provider):
-    assert provider.get(GTFSService, u'The weather in london', None) == None
+    assert provider.get(None, u'The weather in london', 'asdfjkl') == 'asdfjkl'
+
+
+def test_sql_entity_mixin_build_select():
+    class FakeEntity(SQLEntityMixin):
+        __table__ = 'fake'
+        __field_map__ = OrderedDict([
+            ('lorem', 'ipsum'),
+            ('foo', 'bar'),
+        ])
+
+    assert (FakeEntity._build_select([]) ==
+            'select ipsum as lorem, bar as foo from fake')
+    assert (FakeEntity._build_select(['_feed_url', 'fake_id']) ==
+            ('select ipsum as lorem, bar as foo from fake '
+             'where _feed_url=? and fake_id=?'))
+
+
+def test_sql_entity_eq(provider):
+    a1 = provider.get(busbus.Agency, u'DTA')
+    assert a1 == a1
+    assert a1 is a1
+    a2 = provider.get(busbus.Agency, u'DTA')
+    assert a1 == a2
+    assert a2 == a1
+    assert not (a1 is a2)
 
 
 entity_len_params = [
@@ -73,12 +99,6 @@ def test_stops_latlon(provider):
 def test_routes_agency(provider):
     for route in provider.routes:
         assert route.agency.id == 'DTA'
-
-
-def test_service(provider):
-    assert len(provider._gtfs_entities[GTFSService]) == 2
-    fullw = provider.get(GTFSService, u'FULLW')
-    assert len(fullw.removed_dates) == 1
 
 
 @pytest.mark.parametrize('time,stop_id,count', [

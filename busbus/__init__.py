@@ -71,5 +71,8 @@ class Arrival(BaseEntity):
                  'short_name', 'bikes_ok')
     __repr_attrs__ = ('route', 'stop', 'time')
 
+    def __lt__(self, other):
+        return self.time < other.time
+
 
 ENTITIES = (Agency, Stop, Route, Arrival)

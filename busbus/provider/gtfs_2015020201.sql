@@ -1,6 +1,8 @@
 -- this must be the same as SCHEMA_USER_VERSION in gtfs.py
 pragma user_version = 2015020201;
 
+-- TABLES ---------------------------------------------------------------------
+
 create table _feeds (
     url text,
     sha256sum text,
@@ -172,3 +174,10 @@ create table feed_info (
     feed_end_date date,
     feed_version text
 );
+
+-- VIEWS ----------------------------------------------------------------------
+
+create view trips_v as
+    select t.*, st.min_arrival_time from trips as t join
+        (select _feed_url, trip_id, min(arrival_time) as min_arrival_time from stop_times group by trip_id) as st
+        on t.trip_id=st.trip_id and t._feed_url=st._feed_url;

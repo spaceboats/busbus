@@ -11,6 +11,7 @@ import codecs
 from collections import OrderedDict
 import datetime
 import hashlib
+import heapq
 import itertools
 import operator
 import os
@@ -54,41 +55,93 @@ def fix_type(value, typename):
     }.get(typename, lambda s: s)(value) if value else None
 
 
-sqlite3.register_converter('gtfstime', lambda s: datetime.timedelta(int(s)))
-sqlite3.register_converter('timedelta', lambda s: datetime.timedelta(int(s)))
+for typename in ('gtfstime', 'timedelta'):
+    sqlite3.register_converter(typename,
+                               lambda s: datetime.timedelta(seconds=int(s)))
 
 
-class GTFSAgency(busbus.Agency):
+class SQLEntityMixin(object):
+
+    def __eq__(self, other):
+        if not ('id' in self and 'id' in other):
+            return False
+        return self['id'] == other['id']
+
+    @classmethod
+    def _build_select(cls, columns, named_params=False):
+        query = 'select {0} from {1}'.format(
+            ', '.join('{1} as {0}'.format(k, v)
+                      for k, v in cls.__field_map__.items()),
+            cls.__table__)
+        if columns:
+            if named_params:
+                query += ' where {0}'.format(
+                    ' and '.join('{0}=:{0}'.format(c) for c in columns))
+            else:
+                query += ' where {0}'.format(
+                    ' and '.join('{0}=?'.format(c) for c in columns))
+        return query
+
+    def _query(self, **kwargs):
+        return self.provider._query(self.__class__, **kwargs)
+
+    @classmethod
+    def from_id(cls, provider, id, default=None):
+        """
+        Special case of _query that doesn't require an instantiated object
+        and to fetch by a specific column name.
+        """
+        id_field = cls.__field_map__['id']
+        result = provider._query(cls, **{id_field: id}).fetchone()
+        if result is None:
+            return default
+        else:
+            return cls(provider, **dict(result))
+
+
+class GTFSAgency(SQLEntityMixin, busbus.Agency):
+    __table__ = 'agency'
+    __field_map__ = {
+        'id': 'agency_id',
+        'name': 'agency_name',
+        'url': 'agency_url',
+        'timezone': 'agency_timezone',
+        'lang': 'agency_lang',
+        'phone_human': 'agency_phone',
+        'fare_url': 'agency_fare_url',
+    }
 
     def __init__(self, provider, **data):
-        if 'lang' in data:
+        if data.get('lang'):
             data['lang'] = data['lang'].lower()
-        if 'phone_human' in data and 'country' in data:
-            phone = phonenumbers.parse(data['phone_human'],
-                                       data['country'])
+        if data.get('phone_human') and getattr(provider, 'country'):
+            phone = phonenumbers.parse(data['phone_human'], provider.country)
             data['phone_e164'] = phonenumbers.format_number(
                 phone, phonenumbers.PhoneNumberFormat.E164)
 
         super(GTFSAgency, self).__init__(provider, **data)
 
 
-class GTFSStop(busbus.Stop):
+class GTFSStop(SQLEntityMixin, busbus.Stop):
+    __table__ = 'stops'
+    __field_map__ = {
+        'id': 'stop_id',
+        'code': 'stop_code',
+        'name': 'stop_name',
+        'description': 'stop_desc',
+        'latitude': 'stop_lat',
+        'longitude': 'stop_lon',
+        'url': 'stop_url',
+        '_parent_id': 'parent_station',
+        'timezone': 'stop_timezone',
+        '_accessible': 'wheelchair_boarding',
+    }
 
     def __init__(self, provider, **data):
-        if '_lat' in data and '_lon' in data:
-            try:
-                data['latitude'] = float(data['_lat'])
-                data['longitude'] = float(data['_lon'])
-            except ValueError:
-                data['location'] = None
-        if '_zone_id' in data:
-            pass  # FIXME
-        if '_parent_id' in data:
+        if data.get('_parent_id'):
             data['parent'] = busbus.entity.LazyEntityProperty(
                 provider.get, busbus.Stop, data['_parent_id'])
-            provider._add_relation(busbus.Stop, data['_parent_id'],
-                                   'children', self)
-        if not data.get('timezone', None):
+        if not data.get('timezone'):
             data['timezone'] = provider._timezone
         if '_accessible' in data:
             pass  # FIXME
@@ -97,18 +150,28 @@ class GTFSStop(busbus.Stop):
 
     @property
     def children(self):
-        return Queryable(self.provider._get_relation(self, 'children'))
-
-    @property
-    def _trips(self):
-        return Queryable(self.provider._get_relation(self, 'trips'))
+        result = self._query(parent_station=self.id)
+        return Queryable(GTFSStop(**dict(row)) for row in result)
 
 
-class GTFSRoute(busbus.Route):
+class GTFSRoute(SQLEntityMixin, busbus.Route):
+    __table__ = 'routes'
+    __field_map__ = {
+        'id': 'route_id',
+        '_agency_id': 'agency_id',
+        'short_name': 'route_short_name',
+        'name': 'route_long_name',
+        'description': 'route_desc',
+        '_type': 'route_type',
+        'url': 'route_url',
+        'color': 'route_color',
+        'text_color': 'route_text_color',
+    }
 
     def __init__(self, provider, **data):
         if '_agency_id' in data:
-            data['agency'] = provider.get(busbus.Agency, data['_agency_id'])
+            data['agency'] = busbus.entity.LazyEntityProperty(
+                provider.get, busbus.Agency, data['_agency_id'])
         if '_type' in data:
             pass  # FIXME
 
@@ -116,6 +179,7 @@ class GTFSRoute(busbus.Route):
 
     @property
     def directions(route):
+        # FIXME:gtfs-rewrite
         hashes = []
         for trip in route.provider._get_relation(route, 'trips'):
             direction = {'stops': [stop_time.stop for stop_time
@@ -132,257 +196,114 @@ class GTFSRoute(busbus.Route):
                 yield direction
 
 
-class GTFSArrival(busbus.Arrival):
-    __derived__ = True
+class ArrivalIterator(util.Iterable):
+    """
+    Private class to build arrivals, in order of arrival time, given a list of
+    stops and routes.
+    """
 
-    def __init__(self, provider, **data):
-        super(GTFSArrival, self).__init__(provider, **data)
+    def __init__(self, provider, stops, routes, start, end):
+        self.start = (arrow.now() if start is None
+                      else arrow.get(start)).to(provider._timezone)
+        self.end = (self.start.replace(hours=3) if end is None
+                    else arrow.get(start)).to(provider._timezone)
+        self.provider = provider
+        self.service_cache = {}
+        self.freq_cache = {}
 
+        st_query = """select distinct st.*, min_arrival_time, service_id,
+            trip_headsign, trip_short_name, bikes_allowed
+        from trips_v as t join stop_times as st on
+            t.trip_id=st.trip_id and t._feed_url=st._feed_url
+        where route_id=:route_id and stop_id=:stop_id and
+            t._feed_url=:_feed_url"""
+        iters = []
+        for stop, route in itertools.product(stops, routes):
+            st_filter = {'route_id': route.id, 'stop_id': stop.id,
+                         '_feed_url': self.provider.gtfs_url}
+            for stop_time in provider.conn.execute(st_query, st_filter):
+                iters.append(self._build_arrivals(stop, route, stop_time))
+        self.it = heapq.merge(*iters)
 
-class GTFSService(busbus.entity.BaseEntity):
-    __attrs__ = ('id', 'days', 'start_date', 'end_date', 'added_dates',
-                 'removed_dates')
+    def __next__(self):
+        return next(self.it)
 
-    def __init__(self, provider, **data):
-        # Days of the week: 1 = Monday, 7 = Sunday (ISO 8601)
-        days = ('monday', 'tuesday', 'wednesday', 'thursday', 'friday',
-                'saturday', 'sunday')
-        data['days'] = list(i + 1 for i, day in enumerate(days)
-                            if data.get(day) == u'1')
-        for attr in ('start_date', 'end_date'):
-            if attr in data:
-                data[attr] = arrow.get(data[attr], 'YYYYMMDD').date()
-        data['added_dates'] = set()
-        data['removed_dates'] = set()
+    def _build_arrivals(self, stop, route, stop_time):
+        def build_arr(day, offset=None):
+            if offset is None:
+                offset = datetime.timedelta()
+            time = day + stop_time['arrival_time'] + offset
+            if not (self.start <= time <= self.end):
+                return
+            dep = (day + stop_time['departure_time'] + offset if
+                   stop_time['departure_time'] else None)
+            bikes_ok = {1: True, 2: False}.get(stop_time['bikes_allowed'])
+            return busbus.Arrival(self.provider, stop=stop, route=route,
+                                  time=time, departure_time=dep,
+                                  headsign=stop_time['trip_headsign'],
+                                  short_name=stop_time['trip_short_name'],
+                                  bikes_ok=bikes_ok)
 
-        super(GTFSService, self).__init__(provider, **data)
+        days = filter(self._valid_date_filter(stop_time['service_id']),
+                      arrow.Arrow.range('day', self.start.floor('day'),
+                                        self.end.ceil('day')))
+        freqs = self._frequencies(stop_time['trip_id'])
+        trip_start = datetime.timedelta(seconds=stop_time['min_arrival_time'])
+        for day in days:
+            # GTFS time is relative to noon
+            day = day.replace(hours=12)
+            for freq in freqs:
+                freq_start = day + freq['start_time']
+                freq_end = day + freq['end_time']
+                rel_time = freq_start - (day + trip_start)
+                offset = datetime.timedelta()
+                while freq_start + offset <= freq_end:
+                    arrival = build_arr(day, offset + rel_time)
+                    if arrival:
+                        yield arrival
+                    offset += freq['headway_secs']
+            if not freqs:
+                arrival = build_arr(day)
+                if arrival:
+                    yield arrival
 
-    @classmethod
-    def handle_calendar_dates(cls, provider, **data):
-        if not all(x in data for x in ('id', 'date', 'type')):
-            return
-        service = provider.get(cls, data['id'])
-        attr = {u'1': 'added_dates', u'2': 'removed_dates'}[data['type']]
-        getattr(service, attr).add(arrow.get(data['date'], 'YYYYMMDD').date())
+    def _valid_date_filter(self, service_id):
+        serv = self._service(service_id)
+        def valid_date(day):
+            weekday = day.format('dddd').lower()
+            day = day.date()  # convert from Arrow to datetime.date
+            # schedule exceptions: 1 = added, 2 = removed
+            return ((serv['start_date'] <= day <= serv['end_date']) and
+                    (serv['exceptions'].get(day, 0) != 2) and
+                    (serv[weekday] or serv['exceptions'].get(day, 0) == 1))
+        return valid_date
 
+    def _frequencies(self, trip_id):
+        if trip_id not in self.freq_cache:
+            query = """select start_time, end_time, headway_secs
+            from frequencies where trip_id=:trip_id and
+            _feed_url=:_feed_url order by start_time asc"""
+            filter = {'trip_id': trip_id, '_feed_url': self.provider.gtfs_url}
+            self.freq_cache[trip_id] = self.provider.conn.execute(
+                query, filter).fetchall()
+        return self.freq_cache[trip_id]
 
-class GTFSTrip(busbus.entity.BaseEntity):
-    __attrs__ = ('id', 'route', 'service', 'headsign', 'short_name', 'block',
-                 'shape', 'accessible', 'bikes_ok')
+    def _service(self, id):
+        if id not in self.service_cache:
+            c_query = """select start_date, end_date, monday, tuesday,
+            wednesday, thursday, friday, saturday, sunday from calendar
+            where service_id=:service_id and _feed_url=:_feed_url"""
+            c_filter = {'service_id': id,
+                        '_feed_url': self.provider.gtfs_url}
+            self.service_cache[id] = dict(self.provider.conn.execute(
+                c_query, c_filter).fetchone())
 
-    def __init__(self, provider, **data):
-        data['route'] = provider.get(busbus.Route, data['_route_id'])
-        data['service'] = provider.get(GTFSService, data['_service_id'])
-        if '_block_id' in data:
-            pass  # FIXME
-        if '_shape_id' in data:
-            pass  # FIXME
-        if '_accessible' in data:
-            pass  # FIXME
-        if '_bikes' in data:
-            data['bikes_ok'] = {u'0': None, u'1': True,
-                                u'2': False}[data['_bikes']]
-        provider._add_relation(GTFSRoute, data['_route_id'], 'trips', self)
-        super(GTFSTrip, self).__init__(provider, **data)
-
-    @property
-    def frequencies(self):
-        return Queryable(sorted(
-            self.provider._get_relation(self, 'frequencies'),
-            key=operator.attrgetter('start_time')))
-
-    @property
-    def stop_times(self):
-        return Queryable(sorted(
-            self.provider._get_relation(self, 'stop_times'),
-            key=operator.attrgetter('sequence')))
-
-
-class GTFSTripFrequency(busbus.entity.BaseEntity):
-    __attrs__ = ('trip', 'start_time', 'end_time', 'headway', 'exact_times')
-    __repr_attrs__ = ('trip', 'start_time', 'end_time')
-
-    def __init__(self, provider, **data):
-        data['trip'] = provider.get(GTFSTrip, data['_trip_id'])
-        for attr in ('start_time', 'end_time'):
-            data[attr] = parse_gtfs_time(data[attr])
-        data['headway'] = int(data['headway'])
-        if 'exact_times' in data:
-            data['exact_times'] = bool(int(data['exact_times']))
-        provider._add_relation(GTFSTrip, data['_trip_id'], 'frequencies', self)
-        super(GTFSTripFrequency, self).__init__(provider, **data)
-
-
-class GTFSStopTime(busbus.entity.BaseEntity):
-    __attrs__ = ('trip', 'stop', 'arrival_time', 'departure_time', 'sequence',
-                 'headsign', 'pickup', 'dropoff', 'shape_dist_traveled',
-                 'exact_times')
-    __repr_attrs__ = ('trip', 'stop', 'arrival_time')
-
-    def __init__(self, provider, **data):
-        data['trip'] = provider.get(GTFSTrip, data['_trip_id'])
-        data['stop'] = provider.get(busbus.Stop, data['_stop_id'])
-        for attr in ('arrival_time', 'departure_time'):
-            if attr in data:
-                data[attr] = parse_gtfs_time(data[attr])
-        if 'departure_time' in data:
-            if data['departure_time'] == data['arrival_time']:
-                del data['departure_time']
-        data['sequence'] = int(data['sequence'])
-        if 'pickup' in data:
-            pass  # FIXME
-        if 'dropoff' in data:
-            pass  # FIXME
-        if 'shape_dist_traveled' in data:
-            data['shape_dist_traveled'] = float(data['shape_dist_traveled'])
-        if 'arrival_time' not in data or data['arrival_time'] is None:
-            data['arrival_time'] = busbus.entity.LazyEntityProperty(
-                self.relative_stop_time, self)
-            data['exact_times'] = 0
-        elif 'exact_times' in data:
-            data['exact_times'] = {u'0': False, u'1': True}.get(
-                data['exact_times'], True)
-        provider._add_relation(GTFSTrip, data['_trip_id'], 'stop_times', self)
-        provider._add_relation(busbus.Stop, data['_stop_id'], 'trips',
-                               data['trip'])
-        super(GTFSStopTime, self).__init__(provider, **data)
-
-    @staticmethod
-    def relative_stop_time(stop_time):
-        """
-        Calculate stop_time based on shape_dist_traveled (or failing that, how
-        many stops).
-        """
-        all_stops = tuple(stop_time.trip.stop_times)
-        index = all_stops.index(stop_time)
-        for left_index, left in list(enumerate(all_stops))[index-1::-1]:
-            if 'arrival_time' not in left._lazy_properties:
-                break
-        for right_index, right in list(enumerate(all_stops))[index+1:]:
-            if 'arrival_time' not in right._lazy_properties:
-                break
-        time_lr = (right.arrival_time - left.arrival_time).total_seconds()
-        if all(x.shape_dist_traveled is not None
-               for x in (left, stop_time, right)):
-            # use shape_dist_traveled to estimate arrival time
-            dist_lr = right.shape_dist_traveled - left.shape_dist_traveled
-            dist = right.shape_dist_traveled - stop_time.shape_dist_traveled
-            time = (dist / dist_lr) * time_lr
-            return left.arrival_time + datetime.timedelta(seconds=time)
-        else:
-            # use number of stops to estimate arrival time
-            num_lr = right_index - left_index
-            num = right_index - index
-            time = (num / num_lr) * time_lr
-            return left.arrival_time + datetime.timedelta(seconds=time)
-
-
-GTFS_FILENAME_MAP = OrderedDict([
-    ('agency.txt', {
-        'rewriter': {
-            'agency_id': 'id',
-            'agency_name': 'name',
-            'agency_url': 'url',
-            'agency_timezone': 'timezone',
-            'agency_lang': 'lang',
-            'agency_phone': 'phone_human',
-            'agency_fare_url': 'fare_url',
-        },
-        'class': GTFSAgency,
-    }),
-    ('stops.txt', {
-        'rewriter': {
-            'stop_id': 'id',
-            'stop_code': 'code',
-            'stop_name': 'name',
-            'stop_desc': 'description',
-            'stop_lat': '_lat',
-            'stop_lon': '_lon',
-            'zone_id': '_zone_id',
-            'stop_url': 'url',
-            'parent_station': '_parent_id',
-            'stop_timezone': 'timezone',
-            'accessible': '_accessible',
-        },
-        'class': GTFSStop,
-    }),
-    ('routes.txt', {
-        'rewriter': {
-            'route_id': 'id',
-            'agency_id': '_agency_id',
-            'route_short_name': 'short_name',
-            'route_long_name': 'name',
-            'route_desc': 'description',
-            'route_type': '_type',
-            'route_url': 'url',
-            'route_color': 'color',
-            'route_text_color': 'text_color',
-        },
-        'class': GTFSRoute,
-    }),
-    ('calendar.txt', {
-        'rewriter': {
-            'service_id': 'id',
-            'monday': 'monday',
-            'tuesday': 'tuesday',
-            'wednesday': 'wednesday',
-            'thursday': 'thursday',
-            'friday': 'friday',
-            'saturday': 'saturday',
-            'sunday': 'sunday',
-            'start_date': 'start_date',
-            'end_date': 'end_date',
-        },
-        'class': GTFSService,
-    }),
-    ('calendar_dates.txt', {
-        'rewriter': {
-            'service_id': 'id',
-            'date': 'date',
-            'exception_type': 'type',
-        },
-        'function': GTFSService.handle_calendar_dates,
-    }),
-    ('trips.txt', {
-        'rewriter': {
-            'route_id': '_route_id',
-            'service_id': '_service_id',
-            'trip_id': 'id',
-            'trip_headsign': 'headsign',
-            'trip_short_name': 'short_name',
-            'block_id': '_block_id',
-            'shape_id': '_shape_id',
-            'wheelchair_accessible': '_accessible',
-            'bikes_allowed': '_bikes',
-        },
-        'class': GTFSTrip,
-    }),
-    ('frequencies.txt', {
-        'rewriter': {
-            'trip_id': '_trip_id',
-            'start_time': 'start_time',
-            'end_time': 'end_time',
-            'headway_secs': 'headway',
-            'exact_times': 'exact_times',
-        },
-        'class': GTFSTripFrequency,
-    }),
-    ('stop_times.txt', {
-        'rewriter': {
-            'trip_id': '_trip_id',
-            'stop_id': '_stop_id',
-            'arrival_time': 'arrival_time',
-            'departure_time': 'departure_time',
-            'stop_sequence': 'sequence',
-            'stop_headsign': 'headsign',
-            'pickup_type': 'pickup',
-            'drop_off_type': 'dropoff',
-            'shape_dist_traveled': 'shape_dist_traveled',
-            'timepoint': 'exact_times',
-        },
-        'class': GTFSStopTime,
-    }),
-])
+            cd_query = """select date, exception_type from calendar_dates
+            where service_id=:service_id and _feed_url=:_feed_url"""
+            cd_result = self.provider.conn.execute(cd_query, c_filter)
+            self.service_cache[id]['exceptions'] = {r[0]: r[1]
+                                                    for r in cd_result}
+        return self.service_cache[id]
 
 
 class GTFSArrivalQueryable(Queryable):
@@ -392,21 +313,35 @@ class GTFSArrivalQueryable(Queryable):
 
     def __init__(self, provider, query_funcs=None, **kwargs):
         self.provider = provider
-        if 'stop.id' in kwargs:
-            stop_id = kwargs.pop('stop.id')
-            kwargs['stop'] = provider.get(busbus.Stop, stop_id)
-        if 'route.id' in kwargs:
-            route_id = kwargs.pop('route.id')
-            kwargs['route'] = provider.get(busbus.Route, route_id)
+
+        if 'stop' in kwargs:
+            stops = [kwargs.pop('stop')]
+        elif 'stop.id' in kwargs:
+            stop = provider.get(busbus.Stop, kwargs.pop('stop.id'), None)
+            stops = [] if stop is None else [stop]
+        else:
+            stops = provider.stops
+
+        if 'route' in kwargs:
+            routes = [kwargs.pop('route')]
+        elif 'route.id' in kwargs:
+            route = provider.get(busbus.Route, kwargs.pop('route.id'), None)
+            routes = [] if route is None else [route]
+        else:
+            routes = provider.routes
+
         for attr in ('start_time', 'end_time'):
             if attr in kwargs:
                 if isinstance(kwargs[attr], datetime.datetime):
                     kwargs[attr] = arrow.Arrow.fromdatetime(kwargs[attr])
                 elif isinstance(kwargs[attr], datetime.date):
                     kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
-        it = provider._build_arrivals(kwargs)
-        self.kwargs = kwargs
+        start_time = kwargs.pop('start_time', None)
+        end_time = kwargs.pop('end_time', None)
+
+        it = ArrivalIterator(provider, stops, routes, start_time, end_time)
         super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
+        self.kwargs = kwargs
 
     def where(self, query_func=None, **kwargs):
         new_funcs = (self.query_funcs + (query_func,) if query_func else
@@ -432,6 +367,7 @@ class GTFSMixin(object):
         self.conn = sqlite3.connect(db_path, isolation_level='DEFERRED',
                                     detect_types=(sqlite3.PARSE_DECLTYPES |
                                                   sqlite3.PARSE_COLNAMES))
+        self.conn.row_factory = sqlite3.Row
 
         version = self.conn.execute('pragma user_version').fetchone()[0]
         if version == 0:
@@ -453,6 +389,7 @@ class GTFSMixin(object):
 
         if isinstance(gtfs_url, six.binary_type):
             gtfs_url = gtfs_url.decode('utf-8')
+        self.gtfs_url = gtfs_url
         resp = self._cached_requests.get(gtfs_url)
         zip = six.BytesIO(resp.content).getvalue()
         hash = hashlib.sha256(zip).hexdigest()
@@ -489,66 +426,25 @@ class GTFSMixin(object):
     def __del__(self):
         self.conn.close()
 
-    def _build_arrivals(self, kw):
-        start = arrow.get(kw.get('start_time', arrow.now())).to(self._timezone)
-        end = arrow.get(kw.get('end_time',
-                               start.replace(hours=3))).to(self._timezone)
-        if end <= start:
-            return
+    def _query(self, cls, **kwargs):
+        if '_feed_url' not in kwargs:
+            kwargs['_feed_url'] = self.gtfs_url
+        return self.conn.execute(
+            cls._build_select(kwargs.keys(), named_params=True), kwargs)
 
-        def valid_date(service, day):
-            return ((service.start_date <= day <= service.end_date) and
-                    (day not in service.removed_dates) and
-                    (day.isoweekday() in service.days or
-                     day in service.added_dates))
-
-        def build_arrival(stop, route, trip, stop_time,
-                          offset=datetime.timedelta()):
-            arr = day + stop_time.arrival_time + offset
-            if not (start <= arr <= end):
-                return
-            dep = (day + stop_time.departure_time + offset if
-                   stop_time.departure_time else None)
-            return GTFSArrival(self, stop=stop, route=route, time=arr,
-                               departure_time=dep, headsign=trip.headsign,
-                               short_name=trip.short_name,
-                               bikes_ok=trip.bikes_ok)
-
-        for route in ((kw['route'],) if 'route' in kw else self.routes):
-            for stop in ((kw['stop'],) if 'stop' in kw else self.stops):
-                for trip in stop._trips.where(route=route):
-                    first_stop = next(trip.stop_times)
-                    for stop_time in trip.stop_times.where(stop=stop):
-                        for day in arrow.Arrow.range('day', start.floor('day'),
-                                                     end.ceil('day')):
-                            day += datetime.timedelta(hours=12)  # noon start
-                            if valid_date(trip.service, day.date()):
-                                for freq in trip.frequencies:
-                                    freq_start = day + freq.start_time
-                                    freq_end = day + freq.end_time
-                                    rel_time = freq_start - (
-                                        day + first_stop.arrival_time)
-                                    offset = datetime.timedelta()
-                                    headway = datetime.timedelta(
-                                        seconds=freq.headway)
-                                    while freq_start + offset <= freq_end:
-                                        arr = build_arrival(stop, route, trip,
-                                                            stop_time,
-                                                            offset + rel_time)
-                                        if arr:
-                                            yield arr
-                                        offset += headway
-                                    # don't build arrivals out of this block
-                                    continue
-                                arrival = build_arrival(stop, route, trip,
-                                                        stop_time)
-                                if arrival:
-                                    yield arrival
+    def _entity_builder(self, cls, **kwargs):
+        return Queryable(cls(self, **dict(row))
+                         for row in self._query(cls))
 
     def get(self, cls, id, default=None):
-        try:
-            return self._gtfs_id_index[(util.entity_type(cls), id)]
-        except KeyError:
+        typemap = {
+            busbus.Agency: GTFSAgency,
+            busbus.Stop: GTFSStop,
+            busbus.Route: GTFSRoute,
+        }
+        if cls in typemap:
+            return typemap[cls].from_id(self, id, default)
+        else:
             return default
 
     @property
@@ -560,15 +456,15 @@ class GTFSMixin(object):
 
     @property
     def agencies(self):
-        return Queryable(self._gtfs_entities[busbus.Agency])
+        return self._entity_builder(GTFSAgency)
 
     @property
     def stops(self):
-        return Queryable(self._gtfs_entities[busbus.Stop])
+        return self._entity_builder(GTFSStop)
 
     @property
     def routes(self):
-        return Queryable(self._gtfs_entities[busbus.Route])
+        return self._entity_builder(GTFSRoute)
 
     @property
     def arrivals(self):
