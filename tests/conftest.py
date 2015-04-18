@@ -3,6 +3,11 @@ from busbus.provider import ProviderBase
 from busbus.provider.gtfs import GTFSMixin
 
 import arrow
+try:
+    # prefer the stdlib version of mock (>= 3.3)
+    import unittest.mock as mock
+except ImportError:
+    import mock
 import pytest
 
 
@@ -16,11 +21,12 @@ class SampleGTFSProvider(GTFSMixin, ProviderBase):
                     'sample-feed.zip')
         super(SampleGTFSProvider, self).__init__(engine, gtfs_url)
 
-    def _build_arrivals(self, kw):
-        # Set a default start_time that fits within the sample feed's dates
-        if 'start_time' not in kw:
-            kw['start_time'] = arrow.get('2007-06-03T06:45:00-07:00')
-        return super(SampleGTFSProvider, self)._build_arrivals(kw)
+    @property
+    def arrivals(self):
+        # Set a current time that fits within the sample feed's dates
+        with mock.patch('arrow.now') as mock_now:
+            mock_now.return_value = arrow.get('2007-06-03T06:45:00-07:00')
+            return super(SampleGTFSProvider, self).arrivals
 
 
 @pytest.fixture(scope='session')
