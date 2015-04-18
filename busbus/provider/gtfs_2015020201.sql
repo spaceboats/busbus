@@ -89,6 +89,7 @@ create table stop_times (
     drop_off_type integer,
     shape_dist_traveled real,
     timepoint integer,
+    primary key (_feed_url, trip_id, stop_sequence),
     foreign key (_feed_url, trip_id) references trips (_feed_url, trip_id),
     foreign key (_feed_url, stop_id) references stops (_feed_url, stop_id)
 );
@@ -116,6 +117,7 @@ create table calendar_dates (
     foreign key (_feed_url, service_id) references calendar (_feed_url, service_id)
 );
 
+/*
 create table fare_attributes (
     _feed_url text not null,
     fare_id text not null,
@@ -143,8 +145,10 @@ create table shapes (
     shape_pt_lat real not null,
     shape_pt_lon real not null,
     shape_pt_sequence integer not null,
-    shape_dist_traveled real
+    shape_dist_traveled real,
+    primary key (_feed_url, shape_id, shape_pt_sequence)
 );
+*/
 
 create table frequencies (
     _feed_url text not null,
@@ -155,6 +159,7 @@ create table frequencies (
     exact_times integer
 );
 
+/*
 create table transfers (
     _feed_url text not null,
     from_stop_id text not null,
@@ -174,6 +179,7 @@ create table feed_info (
     feed_end_date date,
     feed_version text
 );
+*/
 
 -- VIEWS ----------------------------------------------------------------------
 
