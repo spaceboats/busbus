@@ -52,7 +52,7 @@ entity_len_params = [
     ('stops', 9),
     ('routes', 5),
     # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
-    ('arrivals', 141),
+    ('arrivals', 139),
 ]
 
 
@@ -106,15 +106,16 @@ def test_routes_agency(provider):
     # STBA: 6 arrivals (every half hour)
     # CITY1: 2 arrivals from 06:45-07:59 (every half hour)
     #       10 arrivals from 08:00-09:45 (every 10 minutes)
-    # CITY2: same, plus another arrival from the 06:30 trip
+    # CITY2: 3 arrivals from 06:45-07:59 (trip start time)
+    #        9 arrivals from 08:00-09:45 (trip start time)
     # Sunday
-    ('2007-06-03T06:45:00-07:00', u'STAGECOACH', 31),
+    ('2007-06-03T06:45:00-07:00', u'STAGECOACH', 30),
     ('2007-06-03T06:45:00-07:00', u'AMV', 1),
     # Monday (FULLW exception)
     ('2007-06-04T06:45:00-07:00', u'STAGECOACH', 0),
     ('2007-06-04T06:45:00-07:00', u'AMV', 0),
     # Tuesday
-    ('2007-06-05T06:45:00-07:00', u'STAGECOACH', 31),
+    ('2007-06-05T06:45:00-07:00', u'STAGECOACH', 30),
     ('2007-06-05T06:45:00-07:00', u'AMV', 0)
 ])
 def test_valid_arrivals(provider, time, stop_id, count):
