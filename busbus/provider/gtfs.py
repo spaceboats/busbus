@@ -8,7 +8,7 @@ import busbus.util.csv as utilcsv
 
 import arrow
 import codecs
-from collections import OrderedDict
+import collections
 import datetime
 import hashlib
 import heapq
@@ -57,7 +57,7 @@ def fix_type(value, typename):
 
 for typename in ('gtfstime', 'timedelta'):
     sqlite3.register_converter(typename,
-                               lambda s: datetime.timedelta(seconds=int(s)))
+                               lambda s: datetime.timedelta(seconds=float(s)))
 
 
 class SQLEntityMixin(object):
@@ -420,8 +420,39 @@ class GTFSMixin(object):
                         self.conn.executemany(
                             stmt, ({k: fix_type(row.get(k), columns[k])
                                     for k in columns} for row in data))
+            self.conn.commit()
 
-        self.conn.commit()
+            # interpolate missing stop times
+            for row in self.conn.execute('''select trip_id from stop_times
+                                         where arrival_time is null'''):
+                trip_id = row['trip_id']
+                times = [dict(r) for r in self.conn.execute(
+                    '''select arrival_time as a, departure_time as d,
+                    stop_sequence as seq from stop_times where trip_id=:trip_id
+                    and _feed_url=:_feed_url order by stop_sequence asc''',
+                    {'trip_id': trip_id, '_feed_url': self.gtfs_url})]
+                start, end = 0, 0
+                while start < len(times) - 1:
+                    while (times[start]['a'] is None and
+                           times[start]['d'] is None):
+                        start += 1
+                    end = start + 1
+                    while times[end]['a'] is None:
+                        end += 1
+                    for i in six.moves.range(start+1, end):
+                        start_time = times[start].get('d', times[start]['a'])
+                        gap_time = times[end]['a'] - start_time
+                        fraction = (i - start) / (end - start)
+                        time = (fraction * gap_time.total_seconds() +
+                                start_time.total_seconds())
+                        self.conn.execute(
+                            '''update stop_times set arrival_time=:a where
+                            trip_id=:trip_id and _feed_url=:_feed_url and
+                            stop_sequence=:seq''',
+                            {'trip_id': trip_id, '_feed_url': self.gtfs_url,
+                             'a': time, 'seq': times[i]['seq']})
+                    start = end
+            self.conn.commit()
 
     def __del__(self):
         self.conn.close()
