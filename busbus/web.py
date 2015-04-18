@@ -1,11 +1,11 @@
 import busbus
 from busbus.entity import BaseEntityJSONEncoder
 from busbus.provider import ProviderBase
+from busbus.util import dist
 
 import cherrypy
 import collections
 import itertools
-import math
 import types
 
 
@@ -137,17 +137,6 @@ class Engine(busbus.Engine):
         }
 
     def stops_find(self, **kwargs):
-        def dist(lat1, lon1, lat2, lon2):
-            """
-            Returns the distance between two latitude/longitude pairs in
-            meters.
-            """
-            lat1, lon1, lat2, lon2 = map(math.radians,
-                                         (lat1, lon1, lat2, lon2))
-            return math.acos(math.sin(lat1) * math.sin(lat2) +
-                             math.cos(lat1) * math.cos(lat2) *
-                             math.cos(abs(lon2 - lon1))) * 6371000
-
         expected = ('latitude', 'longitude', 'distance')
         if all(x in kwargs for x in expected):
             for x in expected:

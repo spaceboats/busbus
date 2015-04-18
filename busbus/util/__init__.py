@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import collections
+import math
 import os
 import six
 
@@ -67,3 +68,14 @@ def freezehash(obj):
         return hash(frozenset(freezehash(x) for x in obj))
     else:
         return hash(obj)
+
+
+def dist(lat1, lon1, lat2, lon2):
+    """
+    Returns the distance between two latitude/longitude pairs in
+    meters.
+    """
+    lat1, lon1, lat2, lon2 = map(math.radians, (lat1, lon1, lat2, lon2))
+    return math.acos(math.sin(lat1) * math.sin(lat2) +
+                     math.cos(lat1) * math.cos(lat2) *
+                     math.cos(abs(lon2 - lon1))) * 6371000
