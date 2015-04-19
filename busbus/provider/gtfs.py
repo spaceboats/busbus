@@ -209,7 +209,7 @@ class ArrivalIterator(util.Iterable):
         self.start = (arrow.now() if start is None
                       else arrow.get(start)).to(provider._timezone)
         self.end = (self.start.replace(hours=3) if end is None
-                    else arrow.get(start)).to(provider._timezone)
+                    else arrow.get(end)).to(provider._timezone)
         self.service_cache = {}
         self.freq_cache = {}
         self.it = None
