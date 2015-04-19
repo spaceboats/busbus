@@ -486,6 +486,10 @@ class GTFSMixin(object):
             busbus.Stop: GTFSStop,
             busbus.Route: GTFSRoute,
         }
+        try:
+            cls = util.entity_type(cls)
+        except TypeError:
+            return default
         if cls in typemap:
             return typemap[cls].from_id(self, id, default)
         else:
