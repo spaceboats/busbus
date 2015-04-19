@@ -178,18 +178,26 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
         super(GTFSRoute, self).__init__(provider, **data)
 
     @property
-    def directions(route):
-        # FIXME:gtfs-rewrite
+    def directions(self):
         hashes = []
-        for trip in route.provider._get_relation(route, 'trips'):
-            direction = {'stops': [stop_time.stop for stop_time
-                                   in trip.stop_times]}
-            if trip.headsign is not None:
-                direction['headsign'] = trip.headsign
-            if trip.short_name is not None:
-                direction['short_name'] = trip.short_name
-            if trip.bikes_ok is not None:
-                direction['bikes_ok'] = trip.bikes_ok
+        t_query = """select trip_headsign, trip_short_name, bikes_allowed,
+        trip_id from trips where route_id=:route_id and _feed_url=:_feed_url"""
+        t_filter = {'route_id': self.id, '_feed_url': self.provider.gtfs_url}
+        for trip in self.provider.conn.execute(t_query, t_filter):
+            direction = {}
+            result = self.provider.conn.execute(
+                """select s.* from stop_times as st join stops as s
+                on st.stop_id=s.stop_id and st._feed_url=s._feed_url
+                where st.trip_id=:t_id and st._feed_url=:_feed_url""",
+                {'t_id': trip['trip_id'], '_feed_url': self.provider.gtfs_url})
+            direction['stops'] = [GTFSStop(self.provider, **dict(row))
+                                  for row in result]
+            if trip['trip_headsign'] is not None:
+                direction['headsign'] = trip['trip_headsign']
+            if trip['trip_short_name'] is not None:
+                direction['short_name'] = trip['trip_short_name']
+            if trip['bikes_allowed'] is not None:
+                direction['bikes_ok'] = trip['bikes_allowed']
             h = util.freezehash(direction)
             if h not in hashes:
                 hashes.append(h)

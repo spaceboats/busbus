@@ -62,7 +62,7 @@ def clsname(obj):
 
 
 def freezehash(obj):
-    if isinstance(obj, dict):
+    if isinstance(obj, (dict, collections.Mapping)):
         return hash(frozenset((k, freezehash(v)) for k, v in obj.items()))
     elif isinstance(obj, (tuple, list, set)):
         return hash(frozenset(freezehash(x) for x in obj))
