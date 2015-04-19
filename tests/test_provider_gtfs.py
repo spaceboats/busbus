@@ -18,8 +18,10 @@ def test_engine_has_one_provider(engine, provider):
     assert len(engine._providers) == 1
 
 
-def test_provider_get_default(provider):
-    assert provider.get(None, u'The weather in london', 'asdfjkl') == 'asdfjkl'
+@pytest.mark.parametrize('entity', (None, busbus.Stop, busbus.Arrival))
+def test_provider_get_default(provider, entity):
+    assert provider.get(entity, u'The weather in london',
+                        'asdfjkl') == 'asdfjkl'
 
 
 def test_sql_entity_mixin_build_select():
