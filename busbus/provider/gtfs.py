@@ -221,7 +221,7 @@ class ArrivalIterator(util.Iterable):
             from trips_v as t join stop_times as st on
                 t.trip_id=st.trip_id and t._feed_url=st._feed_url
             where route_id=:route_id and stop_id=:stop_id and
-                t._feed_url=:_feed_url"""
+                t._feed_url=:_feed_url order by arrival_time asc"""
             iters = []
             for stop, route in itertools.product(self.stops, self.routes):
                 for stop_time in self.provider.conn.execute(st_query, {
