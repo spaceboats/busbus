@@ -1,6 +1,7 @@
+from .conftest import SampleGTFSProvider
+
 import busbus
-from busbus.provider import ProviderBase
-from busbus.provider.gtfs import GTFSMixin, GTFSService
+from busbus.provider.gtfs import GTFSService
 
 import arrow
 import datetime
@@ -8,56 +9,49 @@ import pytest
 import six
 
 
-class SampleGTFSProvider(GTFSMixin, ProviderBase):
-
-    def __init__(self, engine=None):
-        # https://developers.google.com/transit/gtfs/examples/gtfs-feed
-        # FIXME We should eventually roll our own GTFS feed as well in order to
-        # test everything
-        gtfs_url = ('https://developers.google.com/transit/gtfs/examples/'
-                    'sample-feed.zip')
-        super(SampleGTFSProvider, self).__init__(engine, gtfs_url)
-
-    def _build_arrivals(self, kw):
-        # Set a default start_time that fits within the sample feed's dates
-        if 'start_time' not in kw:
-            kw['start_time'] = arrow.get('2007-06-03T06:45:00-07:00')
-        return super(SampleGTFSProvider, self)._build_arrivals(kw)
+def test_provider_without_engine():
+    SampleGTFSProvider()
 
 
-@pytest.fixture(scope='module')
-def provider():
-    return SampleGTFSProvider()
-
-
-def test_provider_with_engine():
-    SampleGTFSProvider(busbus.Engine())
+def test_engine_has_one_provider(engine, provider):
+    assert len(engine._providers) == 1
 
 
 def test_provider_get_default(provider):
     assert provider.get(GTFSService, u'The weather in london', None) == None
 
 
-def test_agencies_len(provider):
-    assert len(list(provider.agencies)) == 1
+entity_len_params = [
+    ('agencies', 1),
+    ('stops', 9),
+    ('routes', 5),
+    # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
+    ('arrivals', 141),
+]
 
 
-def test_stops_len(provider):
-    assert len(list(provider.stops)) == 9
+@pytest.mark.parametrize('attr,count', entity_len_params)
+def test_entity_len_engine(engine, attr, count):
+    assert len(list(getattr(engine, attr))) == count
 
+
+@pytest.mark.parametrize('attr,count', entity_len_params)
+def test_entity_len_provider(provider, attr, count):
+    assert len(list(getattr(provider, attr))) == count
+
+
+def test_stops_etc(provider):
     stop = next(provider.stops)
     # Empty CSV fields should be coerced to None
     assert stop.description is None
     # stops.txt inherits agency timezone if blank
     assert stop.timezone == 'America/Los_Angeles'
 
+
+def test_stops_no_children(provider):
     # none of the stops have children
     for stop in provider.stops:
         assert len(list(stop.children)) == 0
-
-
-def test_routes_len(provider):
-    assert len(list(provider.routes)) == 5
 
 
 def test_agencies_unicode(provider):
@@ -72,9 +66,8 @@ def test_agencies_unicode(provider):
 
 def test_stops_latlon(provider):
     for stop in provider.stops:
-        assert len(stop.location) == 2
-        assert isinstance(stop.location[0], float)
-        assert isinstance(stop.location[1], float)
+        assert isinstance(stop.latitude, float)
+        assert isinstance(stop.longitude, float)
 
 
 def test_routes_agency(provider):
@@ -119,8 +112,14 @@ def test_valid_arrivals(provider, time, stop_id, count):
     (datetime.datetime(2007, 6, 3, 13, 45), 6),
 ])
 def test_arrivals_weird_kwargs(provider, time, count):
+    stop = provider.get(busbus.Stop, u'STAGECOACH')
+    route = provider.get(busbus.Route, u'STBA')
+    assert (len(list(provider.arrivals.where(stop=stop, route=route,
+                                             start_time=time))) == count)
+    # test dotted kwargs
     assert (len(list(provider.arrivals.where(
-        stop_id=u'STAGECOACH', route_id=u'STBA', start_time=time))) == count)
+        **{'stop.id': u'STAGECOACH', 'route.id': u'STBA', 'start_time': time}
+    ))) == count)
 
 
 def test_arrivals_end_before_start(provider):

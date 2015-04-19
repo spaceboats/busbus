@@ -5,8 +5,7 @@ python:
   - "3.4"
 install:
   - "pip install -U setuptools"
-  - "python setup.py install"
-  - "pip install -U pytest pytest-pep8 coverage python-coveralls"
+  - "pip install -e . -e .[dev] -e .[web]"
 script: "coverage run --source busbus -m pytest --pep8"
 after_script:
   - "coverage report -m"

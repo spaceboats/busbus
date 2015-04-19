@@ -15,7 +15,7 @@ class MBTAProvider(GTFSMixin, ProviderBase):
     in production; request a key instead.
     """
 
-    legalese = [
+    legal = [
         ('http://www.massdot.state.ma.us/Portals/0/docs/developers/'
          'RelationshipPrinciples.pdf'),
         ('http://www.massdot.state.ma.us/Portals/0/docs/developers/'

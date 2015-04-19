@@ -58,3 +58,12 @@ def entity_type(obj):
 
 def clsname(obj):
     return '{0}.{1}'.format(type(obj).__module__, type(obj).__name__)
+
+
+def freezehash(obj):
+    if isinstance(obj, dict):
+        return hash(frozenset((k, freezehash(v)) for k, v in obj.items()))
+    elif isinstance(obj, (tuple, list, set)):
+        return hash(frozenset(freezehash(x) for x in obj))
+    else:
+        return hash(obj)

@@ -1,10 +1,13 @@
 import busbus
+from busbus.util import clsname
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from cachecontrol import CacheControl
 from cachecontrol.caches import FileCache
+import hashlib
 import requests
 import six
+import uuid
 
 
 @six.add_metaclass(ABCMeta)
@@ -14,7 +17,11 @@ class ProviderBase(object):
     # a minimum polling interval. Defaults to 30 seconds.
     poll_interval = 30
 
-    def __init__(self, engine):
+    def __init__(self, engine, **kwargs):
+        self.id = hashlib.sha1(six.b(
+            '{0}:{1!r}'.format(clsname(self), kwargs.get('__init_args__', {}))
+        )).hexdigest()
+
         if engine:
             self.engine = engine
         else:
@@ -53,3 +60,14 @@ class ProviderBase(object):
     @abstractproperty
     def arrivals(self):
         """Return an iterator of the arrivals for this provider"""
+
+    def __getitem__(self, name):
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            raise KeyError(name)
+
+    def keys(self):
+        for attr in ('id', 'legal', 'credit', 'credit_url', 'country'):
+            if getattr(self, attr, None) is not None:
+                yield attr

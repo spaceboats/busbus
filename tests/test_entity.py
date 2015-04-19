@@ -1,5 +1,7 @@
-from test_provider_gtfs import provider
+import busbus
+from busbus.entity import BaseEntityJSONEncoder
 
+import json
 import pytest
 
 
@@ -17,5 +19,30 @@ def test_entity_failed_getattr(agency):
         agency.the_weather_in_london
 
 
+def test_entity_failed_getitem(agency):
+    with pytest.raises(KeyError):
+        agency['the_weather_in_london']
+
+
+def test_provider_failed_getattr(provider):
+    with pytest.raises(AttributeError):
+        provider.the_weather_in_london
+
+
+def test_provider_failed_getitem(provider):
+    with pytest.raises(KeyError):
+        provider['the_weather_in_london']
+
+
 def test_entity_to_dict(agency):
-    assert agency.to_dict()['id'] == 'DTA'
+    assert dict(agency)['id'] == 'DTA'
+
+
+def test_entity_to_json(provider):
+    json_str = BaseEntityJSONEncoder().encode(next(provider.arrivals))
+    json.loads(json_str)
+
+
+def test_bad_json():
+    with pytest.raises(TypeError):
+        BaseEntityJSONEncoder().encode(busbus.Engine)

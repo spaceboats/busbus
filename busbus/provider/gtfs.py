@@ -54,8 +54,8 @@ class GTFSStop(busbus.Stop):
     def __init__(self, provider, **data):
         if '_lat' in data and '_lon' in data:
             try:
-                data['location'] = (float(data['_lat']),
-                                    float(data['_lon']))
+                data['latitude'] = float(data['_lat'])
+                data['longitude'] = float(data['_lon'])
             except ValueError:
                 data['location'] = None
         if '_zone_id' in data:
@@ -74,11 +74,11 @@ class GTFSStop(busbus.Stop):
 
     @property
     def children(self):
-        return Queryable(self._provider._get_relation(self, 'children'))
+        return Queryable(self.provider._get_relation(self, 'children'))
 
     @property
     def _trips(self):
-        return Queryable(self._provider._get_relation(self, 'trips'))
+        return Queryable(self.provider._get_relation(self, 'trips'))
 
 
 class GTFSRoute(busbus.Route):
@@ -90,6 +90,23 @@ class GTFSRoute(busbus.Route):
             pass  # FIXME
 
         super(GTFSRoute, self).__init__(provider, **data)
+
+    @property
+    def directions(route):
+        hashes = []
+        for trip in route.provider._get_relation(route, 'trips'):
+            direction = {'stops': [stop_time.stop for stop_time
+                                   in trip.stop_times]}
+            if trip.headsign is not None:
+                direction['headsign'] = trip.headsign
+            if trip.short_name is not None:
+                direction['short_name'] = trip.short_name
+            if trip.bikes_ok is not None:
+                direction['bikes_ok'] = trip.bikes_ok
+            h = util.freezehash(direction)
+            if h not in hashes:
+                hashes.append(h)
+                yield direction
 
 
 class GTFSArrival(busbus.Arrival):
@@ -142,18 +159,19 @@ class GTFSTrip(busbus.entity.BaseEntity):
         if '_bikes' in data:
             data['bikes_ok'] = {u'0': None, u'1': True,
                                 u'2': False}[data['_bikes']]
+        provider._add_relation(GTFSRoute, data['_route_id'], 'trips', self)
         super(GTFSTrip, self).__init__(provider, **data)
 
     @property
     def frequencies(self):
         return Queryable(sorted(
-            self._provider._get_relation(self, 'frequencies'),
+            self.provider._get_relation(self, 'frequencies'),
             key=operator.attrgetter('start_time')))
 
     @property
     def stop_times(self):
         return Queryable(sorted(
-            self._provider._get_relation(self, 'stop_times'),
+            self.provider._get_relation(self, 'stop_times'),
             key=operator.attrgetter('sequence')))
 
 
@@ -176,6 +194,7 @@ class GTFSStopTime(busbus.entity.BaseEntity):
     __attrs__ = ('trip', 'stop', 'arrival_time', 'departure_time', 'sequence',
                  'headsign', 'pickup', 'dropoff', 'shape_dist_traveled',
                  'exact_times')
+    __repr_attrs__ = ('trip', 'stop', 'arrival_time')
 
     def __init__(self, provider, **data):
         data['trip'] = provider.get(GTFSTrip, data['_trip_id'])
@@ -350,11 +369,11 @@ class GTFSArrivalQueryable(Queryable):
 
     def __init__(self, provider, query_funcs=None, **kwargs):
         self.provider = provider
-        if 'stop_id' in kwargs:
-            stop_id = kwargs.pop('stop_id')
+        if 'stop.id' in kwargs:
+            stop_id = kwargs.pop('stop.id')
             kwargs['stop'] = provider.get(busbus.Stop, stop_id)
-        if 'route_id' in kwargs:
-            route_id = kwargs.pop('route_id')
+        if 'route.id' in kwargs:
+            route_id = kwargs.pop('route.id')
             kwargs['route'] = provider.get(busbus.Route, route_id)
         for attr in ('start_time', 'end_time'):
             if attr in kwargs:
@@ -414,8 +433,9 @@ class GTFSMixin(object):
             self._gtfs_id_index[(cls, entity.id)] = entity
 
     def _build_arrivals(self, kw):
-        start = kw.get('start_time', arrow.now()).to(self._timezone)
-        end = kw.get('end_time', start.replace(hours=3)).to(self._timezone)
+        start = arrow.get(kw.get('start_time', arrow.now())).to(self._timezone)
+        end = arrow.get(kw.get('end_time',
+                               start.replace(hours=3))).to(self._timezone)
         if end <= start:
             return
 

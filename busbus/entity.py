@@ -1,4 +1,10 @@
+import busbus.provider
 from busbus import util
+
+import arrow
+import collections
+import json
+from six.moves import reduce
 
 
 class LazyEntityProperty(object):
@@ -17,7 +23,7 @@ class BaseEntity(object):
     __derived__ = False
 
     def __init__(self, provider, **kwargs):
-        self._provider = provider
+        self.provider = provider
         self._lazy_properties = {}
 
         for attr in getattr(self, '__attrs__', []):
@@ -41,9 +47,30 @@ class BaseEntity(object):
             del self._lazy_properties[name]
             setattr(self, name, value)
             return value
-        else:
-            raise AttributeError(name)
+        if '.' in name:  # nested attribute
+            return reduce(getattr, name.split('.'), self)
+        raise AttributeError(name)
 
-    def to_dict(self):
-        return dict((attr, getattr(self, attr)) for attr in self.__attrs__
-                    if getattr(self, attr) is not None)
+    def __getitem__(self, name):
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            raise KeyError(name)
+
+    def keys(self):
+        yield 'provider'
+        for attr in self.__attrs__:
+            if getattr(self, attr, None) is not None:
+                yield attr
+
+
+class BaseEntityJSONEncoder(json.JSONEncoder):
+
+    def default(self, o):
+        if isinstance(o, (BaseEntity, busbus.provider.ProviderBase)):
+            return dict(o)
+        elif isinstance(o, arrow.Arrow):
+            return o.timestamp
+        elif isinstance(o, collections.Iterable):
+            return list(o)
+        return super(BaseEntityJSONEncoder, self).default(o)

@@ -3,6 +3,10 @@ from busbus.provider.gtfs import GTFSMixin
 
 
 class LawrenceTransitProvider(GTFSMixin, ProviderBase):
+    credit = 'Lawrence Transit'
+    credit_url = 'http://www.lawrencetransit.org/'
+    country = 'US'
+
     gtfs_url = ("http://lawrenceks.org/assets/gis/google-transit/"
                 "google_transit.zip")
 
