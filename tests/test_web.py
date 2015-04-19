@@ -84,6 +84,10 @@ def test_unexpand_none(url_prefix):
     assert set(data['routes'][0]['agency'].keys()) == set(['id'])
 
 
+def test_unexpand_dict():
+    assert busbus.web.unexpand({1: 2}, ()) == {1: 2}
+
+
 def test_unexpand_agencies(url_prefix):
     data, resp = get(url_prefix + 'routes?_expand=agencies')
     assert 'timezone' in data['routes'][0]['agency']
