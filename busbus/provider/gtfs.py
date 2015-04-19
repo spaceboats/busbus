@@ -434,8 +434,9 @@ class GTFSMixin(object):
             self.conn.commit()
 
             # interpolate missing stop times
-            for row in self.conn.execute('''select trip_id from stop_times
-                                         where arrival_time is null'''):
+            for row in self.conn.execute(
+                    '''select trip_id from stop_times where arrival_time is
+                    null and _feed_url=?''', (self.gtfs_url,)):
                 trip_id = row['trip_id']
                 times = [dict(r) for r in self.conn.execute(
                     '''select arrival_time as a, departure_time as d,
