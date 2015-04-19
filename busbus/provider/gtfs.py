@@ -203,29 +203,32 @@ class ArrivalIterator(util.Iterable):
     """
 
     def __init__(self, provider, stops, routes, start, end):
+        self.provider = provider
+        self.stops = stops
+        self.routes = routes
         self.start = (arrow.now() if start is None
                       else arrow.get(start)).to(provider._timezone)
         self.end = (self.start.replace(hours=3) if end is None
                     else arrow.get(start)).to(provider._timezone)
-        self.provider = provider
         self.service_cache = {}
         self.freq_cache = {}
-
-        st_query = """select distinct st.*, min_arrival_time, service_id,
-            trip_headsign, trip_short_name, bikes_allowed
-        from trips_v as t join stop_times as st on
-            t.trip_id=st.trip_id and t._feed_url=st._feed_url
-        where route_id=:route_id and stop_id=:stop_id and
-            t._feed_url=:_feed_url"""
-        iters = []
-        for stop, route in itertools.product(stops, routes):
-            st_filter = {'route_id': route.id, 'stop_id': stop.id,
-                         '_feed_url': self.provider.gtfs_url}
-            for stop_time in provider.conn.execute(st_query, st_filter):
-                iters.append(self._build_arrivals(stop, route, stop_time))
-        self.it = heapq.merge(*iters)
+        self.it = None
 
     def __next__(self):
+        if self.it is None:
+            st_query = """select distinct st.*, min_arrival_time, service_id,
+                trip_headsign, trip_short_name, bikes_allowed
+            from trips_v as t join stop_times as st on
+                t.trip_id=st.trip_id and t._feed_url=st._feed_url
+            where route_id=:route_id and stop_id=:stop_id and
+                t._feed_url=:_feed_url"""
+            iters = []
+            for stop, route in itertools.product(self.stops, self.routes):
+                for stop_time in self.provider.conn.execute(st_query, {
+                        'route_id': route.id, 'stop_id': stop.id,
+                        '_feed_url': self.provider.gtfs_url}):
+                    iters.append(self._build_arrivals(stop, route, stop_time))
+            self.it = heapq.merge(*iters)
         return next(self.it)
 
     def _build_arrivals(self, stop, route, stop_time):
