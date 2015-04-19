@@ -38,13 +38,18 @@ def test_sql_entity_mixin_build_select():
 
 
 def test_sql_entity_eq(provider):
+    class FakeEntity(SQLEntityMixin):
+        pass
+
     a1 = provider.get(busbus.Agency, u'DTA')
     assert a1 == a1
     assert a1 is a1
+    assert a1 != 'the weather in london'
+    assert a1 != FakeEntity()
     a2 = provider.get(busbus.Agency, u'DTA')
     assert a1 == a2
     assert a2 == a1
-    assert not (a1 is a2)
+    assert a1 is not a2
 
 
 entity_len_params = [

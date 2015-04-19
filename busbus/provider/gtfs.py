@@ -61,9 +61,10 @@ for typename in ('gtfstime', 'timedelta'):
 class SQLEntityMixin(object):
 
     def __eq__(self, other):
-        if not ('id' in self and 'id' in other):
+        if not isinstance(other, SQLEntityMixin):
             return False
-        return self['id'] == other['id']
+        return (self.id == getattr(other, 'id', not self.id) and
+                self.provider == getattr(other, 'provider', not self.provider))
 
     @classmethod
     def _build_select(cls, columns, named_params=False):
