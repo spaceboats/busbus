@@ -4,11 +4,9 @@ import busbus
 import busbus.entity
 from busbus.queryable import Queryable
 from busbus import util
-import busbus.util.csv as utilcsv
+from busbus.util.csv import CSVReader
 
 import arrow
-import codecs
-import collections
 import datetime
 import hashlib
 import heapq
@@ -423,8 +421,7 @@ class GTFSMixin(object):
                         continue
                     with z.open(filename) as f:
                         data = six.moves.map(lambda d: dict(itertools.chain(
-                            d, [(u'_feed_url', gtfs_url)])),
-                                             utilcsv.CSVReader(f))
+                            d, [(u'_feed_url', gtfs_url)])), CSVReader(f))
                         columns = {x[1]: x[2] for x in self.conn.execute(
                             'pragma table_info({0})'.format(table))}
                         stmt = ('INSERT INTO {0} ({1}) VALUES ({2})'
