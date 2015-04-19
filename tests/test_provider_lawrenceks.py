@@ -6,8 +6,8 @@ import pytest
 
 
 @pytest.fixture(scope='module')
-def lawrenceks_provider():
-    return LawrenceTransitProvider()
+def lawrenceks_provider(engine):
+    return LawrenceTransitProvider(engine)
 
 
 def test_43_to_eaton_hall(lawrenceks_provider):

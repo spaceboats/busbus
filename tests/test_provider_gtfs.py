@@ -1,6 +1,7 @@
 from .conftest import SampleGTFSProvider
 
 import busbus
+from busbus.provider import ProviderBase
 from busbus.provider.gtfs import SQLEntityMixin
 
 import arrow
@@ -11,7 +12,28 @@ import six
 
 
 def test_provider_without_engine():
-    SampleGTFSProvider()
+    class TestProvider(ProviderBase):
+
+        def get(self, *args, **kwargs):
+            raise NotImplementedError
+
+        @property
+        def agencies(self):
+            raise NotImplementedError
+
+        @property
+        def routes(self):
+            raise NotImplementedError
+
+        @property
+        def stops(self):
+            raise NotImplementedError
+
+        @property
+        def arrivals(self):
+            raise NotImplementedError
+
+    TestProvider(None)
 
 
 def test_engine_has_one_provider(engine, provider):
