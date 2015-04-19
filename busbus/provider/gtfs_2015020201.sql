@@ -45,10 +45,9 @@ create table routes (
     _feed_url text not null,
     route_id text not null,
     agency_id text,
-    -- If the route does not have a short name, please specify a
-    -- route_long_name and use an empty string as the value for this field.
+    -- "At least one of route_short_name or route_long_name must be specified"
     route_short_name text,
-    route_long_name text not null,
+    route_long_name text,
     route_desc text,
     route_type integer not null,
     route_url text,
