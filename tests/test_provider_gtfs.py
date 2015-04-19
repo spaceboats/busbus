@@ -109,6 +109,13 @@ def test_stops_no_children(provider):
         assert len(list(stop.children)) == 0
 
 
+def test_stops_no_children_base(provider):
+    stop = next(provider.stops)
+    stop = busbus.Stop(**dict(stop))
+    print(type(stop))
+    assert len(list(stop.children)) == 0
+
+
 def test_agencies_unicode(provider):
     """
     Our CSV parser should be reading everything in as Unicode.

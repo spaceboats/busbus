@@ -58,7 +58,7 @@ class Stop(BaseEntity):
 
     @property
     def children(self):
-        return self._provider.stops.where(lambda s: s.parent == self)
+        return self.provider.stops.where(lambda s: s.parent == self)
 
 
 class Route(BaseEntity):
