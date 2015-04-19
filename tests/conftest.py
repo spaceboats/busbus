@@ -30,8 +30,15 @@ class SampleGTFSProvider(GTFSMixin, ProviderBase):
 
 
 @pytest.fixture(scope='session')
-def engine():
-    return busbus.Engine()
+def engine_config():
+    return {
+        'gtfs_db_path': ':memory:',
+    }
+
+
+@pytest.fixture(scope='session')
+def engine(engine_config):
+    return busbus.Engine(engine_config)
 
 
 @pytest.fixture(scope='session')

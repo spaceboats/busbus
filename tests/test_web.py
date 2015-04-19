@@ -10,8 +10,8 @@ from wsgi_intercept import requests_intercept, add_wsgi_intercept
 
 
 @pytest.fixture(scope='module')
-def url_prefix(request):
-    engine = busbus.web.Engine()
+def url_prefix(request, engine_config):
+    engine = busbus.web.Engine(engine_config)
     SampleGTFSProvider(engine)
 
     # https://cherrypy.readthedocs.org/en/latest/deploy.html
