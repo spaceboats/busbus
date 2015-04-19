@@ -10,6 +10,11 @@ def lawrenceks_provider(engine):
     return LawrenceTransitProvider(engine)
 
 
+def test_agency_phone_e164(lawrenceks_provider):
+    agency = next(lawrenceks_provider.agencies)
+    assert agency.phone_e164 == '+17858644644'
+
+
 def test_43_to_eaton_hall(lawrenceks_provider):
     stop = lawrenceks_provider.get(busbus.Stop, u'15TH_SPAHR_WB')
     route = lawrenceks_provider.get(busbus.Route, u'RT_43')
