@@ -279,8 +279,8 @@ class ArrivalIterator(util.Iterable):
                     yield arrival
 
     def _valid_date_filter(self, service_id):
-        serv = self._service(service_id)
         def valid_date(day):
+            serv = self._service(service_id)
             weekday = day.format('dddd').lower()
             day = day.date()  # convert from Arrow to datetime.date
             # schedule exceptions: 1 = added, 2 = removed
@@ -422,7 +422,9 @@ class GTFSMixin(object):
                     if filename not in z.namelist():
                         continue
                     with z.open(filename) as f:
-                        data = six.moves.map(lambda d: dict(itertools.chain(d, [(u'_feed_url', gtfs_url)])), utilcsv.CSVReader(f))
+                        data = six.moves.map(lambda d: dict(itertools.chain(
+                            d, [(u'_feed_url', gtfs_url)])),
+                                             utilcsv.CSVReader(f))
                         columns = {x[1]: x[2] for x in self.conn.execute(
                             'pragma table_info({0})'.format(table))}
                         stmt = ('INSERT INTO {0} ({1}) VALUES ({2})'
