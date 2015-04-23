@@ -37,16 +37,17 @@ def parse_gtfs_time(timestr):
     This function returns a timedelta, which contains the number of seconds
     since noon represented by a time on a given day.
     """
-    split = [int(x) for x in timestr.split(':')[-3:]]
-    split = [0] * (3 - len(split)) + split
-    return datetime.timedelta(hours=split[0] - 12, minutes=split[1],
-                              seconds=split[2])
+    split = timestr.split(':')
+    seconds = int(split[-1])
+    minutes = int(split[-2]) if len(split) > 1 else 0
+    hours = int(split[-3]) if len(split) > 2 else 0
+    return (hours - 12) * 3600 + minutes * 60 + seconds
 
 
 def fix_type(value, typename):
     return {
         'date': lambda s: arrow.get(s, 'YYYYMMDD').date(),
-        'gtfstime': lambda s: parse_gtfs_time(s).total_seconds(),
+        'gtfstime': lambda s: parse_gtfs_time(s),
         'integer': int,
         'real': float,
         'timedelta': int,
