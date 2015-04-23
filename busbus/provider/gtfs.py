@@ -424,16 +424,29 @@ class GTFSMixin(object):
                     if filename not in z.namelist():
                         continue
                     with z.open(filename) as f:
-                        data = six.moves.map(lambda d: dict(itertools.chain(
-                            d, [(u'_feed_url', gtfs_url)])), CSVReader(f))
-                        columns = {x[1]: x[2] for x in self.conn.execute(
-                            'pragma table_info({0})'.format(table))}
+                        data = CSVReader(f)
+                        columns = []
+                        col_types = []
+                        for x in self.conn.execute('pragma table_info({0})'.format(table)):
+                            if x[1] in data.header:
+                                columns.append(x[1])
+                                col_types.append(x[2])
+                        # _feed_url must be at end
+                        columns.append('_feed_url')
+                        col_types.append('text')
+
                         stmt = ('INSERT INTO {0} ({1}) VALUES ({2})'
                                 .format(table, ', '.join(columns),
-                                        ', '.join(':' + c for c in columns)))
-                        self.conn.executemany(
-                            stmt, ({k: fix_type(row.get(k), columns[k])
-                                    for k in columns} for row in data))
+                                        ', '.join(('?',) * len(columns))))
+                        def get(row, i):
+                            if columns[i] == '_feed_url':
+                                return gtfs_url
+                            elif i < len(row):
+                                return fix_type(row[i], col_types[i])
+                            else:
+                                return None
+                        row_gen = ([get(row, i) for i in range(len(columns))] for row in data)
+                        self.conn.executemany(stmt, row_gen)
             self.conn.commit()
 
             # interpolate missing stop times
