@@ -80,6 +80,7 @@ create table stop_times (
     -- GTFS says arrival_time/departure_time are required but they're actually
     -- not; if missing they are to be interpolated
     arrival_time gtfstime,
+    _arrival_interpolate gtfstime,
     departure_time gtfstime,
     stop_id text not null,
     stop_sequence integer not null,
@@ -184,5 +185,6 @@ create table feed_info (
 
 create view trips_v as
     select t.*, st.min_arrival_time from trips as t join
-        (select _feed_url, trip_id, min(arrival_time) as min_arrival_time from stop_times group by trip_id) as st
+        (select _feed_url, trip_id, min(coalesce(arrival_time, _arrival_interpolate)) as min_arrival_time
+            from stop_times group by trip_id) as st
         on t.trip_id=st.trip_id and t._feed_url=st._feed_url;

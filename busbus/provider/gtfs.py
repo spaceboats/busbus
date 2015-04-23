@@ -223,8 +223,10 @@ class ArrivalIterator(util.Iterable):
 
     def __next__(self):
         if self.it is None:
-            st_query = """select distinct st.*, min_arrival_time, service_id,
-                trip_headsign, trip_short_name, bikes_allowed
+            st_query = """select distinct min_arrival_time, service_id,
+                trip_headsign, trip_short_name, bikes_allowed,
+                coalesce(st.arrival_time, st._arrival_interpolate) as arr,
+                departure_time, st.trip_id as trip_id
             from trips_v as t join stop_times as st on
                 t.trip_id=st.trip_id and t._feed_url=st._feed_url
             where route_id=:route_id and stop_id=:stop_id and
@@ -242,7 +244,7 @@ class ArrivalIterator(util.Iterable):
         def build_arr(day, offset=None):
             if offset is None:
                 offset = datetime.timedelta()
-            time = day + stop_time['arrival_time'] + offset
+            time = day + datetime.timedelta(seconds=stop_time['arr']) + offset
             if not (self.start <= time <= self.end):
                 return
             dep = (day + stop_time['departure_time'] + offset if
@@ -435,35 +437,38 @@ class GTFSMixin(object):
 
             # interpolate missing stop times
             for row in self.conn.execute(
-                    '''select trip_id from stop_times where arrival_time is
-                    null and _feed_url=?''', (self.gtfs_url,)):
+                    '''select distinct trip_id from stop_times where
+                    arrival_time is null and _feed_url=?''', (self.gtfs_url,)):
                 trip_id = row['trip_id']
-                times = [dict(r) for r in self.conn.execute(
+                known_times = {r['seq']: dict(r) for r in self.conn.execute(
                     '''select arrival_time as a, departure_time as d,
                     stop_sequence as seq from stop_times where trip_id=:trip_id
-                    and _feed_url=:_feed_url order by stop_sequence asc''',
+                    and _feed_url=:_feed_url and arrival_time is not null
+                    order by stop_sequence asc''',
+                    {'trip_id': trip_id, '_feed_url': self.gtfs_url})}
+                if not known_times:
+                    # this trip is headway only
+                    continue
+                unknown_times = [r['stop_sequence'] for r in self.conn.execute(
+                    '''select stop_sequence from stop_times where
+                    trip_id=:trip_id and _feed_url=:_feed_url and
+                    arrival_time is null order by stop_sequence asc''',
                     {'trip_id': trip_id, '_feed_url': self.gtfs_url})]
-                start, end = 0, 0
-                while start < len(times) - 1:
-                    while (times[start]['a'] is None and
-                           times[start]['d'] is None):
-                        start += 1
-                    end = start + 1
-                    while times[end]['a'] is None:
-                        end += 1
-                    for i in six.moves.range(start+1, end):
-                        start_time = times[start].get('d', times[start]['a'])
-                        gap_time = times[end]['a'] - start_time
-                        fraction = (i - start) / (end - start)
-                        time = (fraction * gap_time.total_seconds() +
-                                start_time.total_seconds())
-                        self.conn.execute(
-                            '''update stop_times set arrival_time=:a where
-                            trip_id=:trip_id and _feed_url=:_feed_url and
-                            stop_sequence=:seq''',
-                            {'trip_id': trip_id, '_feed_url': self.gtfs_url,
-                             'a': time, 'seq': times[i]['seq']})
-                    start = end
+                for i, seq in enumerate(unknown_times):
+                    left = max(filter(lambda k: k < seq, known_times))
+                    right = min(filter(lambda k: k > seq, known_times))
+                    start = known_times[left].get('d', known_times[left]['a'])
+                    gap = known_times[right]['a'] - start
+                    count = len(filter(lambda k: left < k < right,
+                                       unknown_times)) + 1
+                    time = ((gap.total_seconds() * (i + 1) / count) +
+                            start.total_seconds())
+                    self.conn.execute(
+                        '''update stop_times set _arrival_interpolate=:a where
+                        trip_id=:trip_id and _feed_url=:_feed_url and
+                        stop_sequence=:seq''',
+                        {'trip_id': trip_id, '_feed_url': self.gtfs_url,
+                         'a': time, 'seq': seq})
             self.conn.commit()
 
     def __del__(self):
