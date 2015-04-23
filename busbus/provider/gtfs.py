@@ -459,8 +459,8 @@ class GTFSMixin(object):
                     right = min(filter(lambda k: k > seq, known_times))
                     start = known_times[left].get('d', known_times[left]['a'])
                     gap = known_times[right]['a'] - start
-                    count = len(filter(lambda k: left < k < right,
-                                       unknown_times)) + 1
+                    count = len(list(filter(lambda k: left < k < right,
+                                            unknown_times))) + 1
                     time = ((gap.total_seconds() * (i + 1) / count) +
                             start.total_seconds())
                     self.conn.execute(
