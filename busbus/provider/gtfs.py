@@ -427,7 +427,8 @@ class GTFSMixin(object):
                         data = CSVReader(f)
                         columns = []
                         col_types = []
-                        for x in self.conn.execute('pragma table_info({0})'.format(table)):
+                        for x in self.conn.execute(
+                                'pragma table_info({0})'.format(table)):
                             if x[1] in data.header:
                                 columns.append(x[1])
                                 col_types.append(x[2])
@@ -438,6 +439,7 @@ class GTFSMixin(object):
                         stmt = ('INSERT INTO {0} ({1}) VALUES ({2})'
                                 .format(table, ', '.join(columns),
                                         ', '.join(('?',) * len(columns))))
+
                         def get(row, i):
                             if columns[i] == '_feed_url':
                                 return gtfs_url
@@ -445,7 +447,8 @@ class GTFSMixin(object):
                                 return fix_type(row[i], col_types[i])
                             else:
                                 return None
-                        row_gen = ([get(row, i) for i in range(len(columns))] for row in data)
+                        row_gen = ([get(row, i) for i in range(len(columns))]
+                                   for row in data)
                         self.conn.executemany(stmt, row_gen)
             self.conn.commit()
 
