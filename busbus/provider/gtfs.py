@@ -6,6 +6,7 @@ from busbus.queryable import Queryable
 from busbus import util
 from busbus.util.csv import CSVReader
 
+import apsw
 import arrow
 import datetime
 import hashlib
@@ -16,7 +17,6 @@ import os
 import phonenumbers
 from pkg_resources import resource_string
 import six
-import sqlite3
 import zipfile
 
 
@@ -44,19 +44,22 @@ def parse_gtfs_time(timestr):
     return (hours - 12) * 3600 + minutes * 60 + seconds
 
 
+def date_to_sql_string(datestr):
+    return '-'.join((datestr[:4], datestr[4:6], datestr[6:]))
+
+
 def fix_type(value, typename):
+    """
+    Functions that map data from the GTFS CSV files to the SQLite database
+    based on column type.
+    """
     return {
-        'date': lambda s: arrow.get(s, 'YYYYMMDD').date(),
-        'gtfstime': lambda s: parse_gtfs_time(s),
+        'date': date_to_sql_string,
+        'gtfstime': parse_gtfs_time,
         'integer': int,
         'real': float,
         'timedelta': int,
     }.get(typename, lambda s: s)(value) if value else None
-
-
-for typename in ('gtfstime', 'timedelta'):
-    sqlite3.register_converter(typename,
-                               lambda s: datetime.timedelta(seconds=float(s)))
 
 
 class SQLEntityMixin(object):
@@ -183,9 +186,11 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
         t_query = """select trip_headsign, trip_short_name, bikes_allowed,
         trip_id from trips where route_id=:route_id and _feed_url=:_feed_url"""
         t_filter = {'route_id': self.id, '_feed_url': self.provider.gtfs_url}
-        for trip in self.provider.conn.execute(t_query, t_filter):
+        cur = self.provider.conn.cursor()
+        for trip in cur.execute(t_query, t_filter):
             direction = {}
-            result = self.provider.conn.execute(
+            innercur = self.provider.conn.cursor()
+            result = innercur.execute(
                 """select s.* from stop_times as st join stops as s
                 on st.stop_id=s.stop_id and st._feed_url=s._feed_url
                 where st.trip_id=:t_id and st._feed_url=:_feed_url""",
@@ -233,8 +238,9 @@ class ArrivalIterator(util.Iterable):
             where route_id=:route_id and stop_id=:stop_id and
                 t._feed_url=:_feed_url order by arrival_time asc"""
             iters = []
+            cur = self.provider.conn.cursor()
             for stop, route in itertools.product(self.stops, self.routes):
-                for stop_time in self.provider.conn.execute(st_query, {
+                for stop_time in cur.execute(st_query, {
                         'route_id': route.id, 'stop_id': stop.id,
                         '_feed_url': self.provider.gtfs_url}):
                     iters.append(self._build_arrivals(stop, route, stop_time))
@@ -297,8 +303,8 @@ class ArrivalIterator(util.Iterable):
             from frequencies where trip_id=:trip_id and
             _feed_url=:_feed_url order by start_time asc"""
             filter = {'trip_id': trip_id, '_feed_url': self.provider.gtfs_url}
-            self.freq_cache[trip_id] = self.provider.conn.execute(
-                query, filter).fetchall()
+            cur = self.provider.conn.cursor()
+            self.freq_cache[trip_id] = cur.execute(query, filter).fetchall()
         return self.freq_cache[trip_id]
 
     def _service(self, id):
@@ -308,13 +314,13 @@ class ArrivalIterator(util.Iterable):
             where service_id=:service_id and _feed_url=:_feed_url"""
             c_filter = {'service_id': id,
                         '_feed_url': self.provider.gtfs_url}
-            self.service_cache[id] = dict(self.provider.conn.execute(
-                c_query, c_filter).fetchone())
+            cur = self.provider.conn.cursor()
+            self.service_cache[id] = dict(next(cur.execute(c_query, c_filter)))
 
-            cd_query = """select date, exception_type from calendar_dates
+            cd_query = """select date, exception_type as e from calendar_dates
             where service_id=:service_id and _feed_url=:_feed_url"""
-            cd_result = self.provider.conn.execute(cd_query, c_filter)
-            self.service_cache[id]['exceptions'] = {r[0]: r[1]
+            cd_result = cur.execute(cd_query, c_filter)
+            self.service_cache[id]['exceptions'] = {r['date']: r['e']
                                                     for r in cd_result}
         return self.service_cache[id]
 
@@ -364,6 +370,18 @@ class GTFSArrivalQueryable(Queryable):
         return GTFSArrivalQueryable(self.provider, new_funcs, **new_kwargs)
 
 
+def gtfs_row_tracer(cur, row):
+    type_map = {
+        'date': lambda s: datetime.date(int(s[:4]), int(s[5:7]), int(s[8:])),
+        'gtfstime': lambda i: datetime.timedelta(seconds=i),
+        'timedelta': lambda i: datetime.timedelta(seconds=i),
+    }
+    desc = cur.getdescription()
+    return {desc[i][0]: (type_map.get(desc[i][1], lambda s: s)(x)
+                         if row[i] is not None else None)
+            for i, x in enumerate(row)}
+
+
 class GTFSMixin(object):
     """
     Mixin to parse transit data from a General Transit Feed Specification feed.
@@ -377,28 +395,27 @@ class GTFSMixin(object):
         db_path = self.engine.config.get(
             'gtfs_db_path',
             os.path.join(self.engine.config['busbus_dir'], 'gtfs.sqlite3'))
-        self.conn = sqlite3.connect(db_path, isolation_level='DEFERRED',
-                                    detect_types=(sqlite3.PARSE_DECLTYPES |
-                                                  sqlite3.PARSE_COLNAMES))
-        self.conn.row_factory = sqlite3.Row
+        self.conn = apsw.Connection(db_path)
+        self.conn.setrowtrace(gtfs_row_tracer)
+        cur = self.conn.cursor()
 
-        version = self.conn.execute('pragma user_version').fetchone()[0]
+        version = next(cur.execute('pragma user_version'))['user_version']
         if version == 0:
             script = resource_string(
                 __name__, 'gtfs_{0}.sql'.format(SCHEMA_USER_VERSION))
             if isinstance(script, six.binary_type):
                 script = script.decode('utf-8')
-            self.conn.executescript(script)
+            cur.execute(script)
         elif version < SCHEMA_USER_VERSION:
             raise NotImplementedError()
         elif version > SCHEMA_USER_VERSION:
             raise RuntimeError('Database version is {0}, but only version {1} '
                                'is known'.format(version, SCHEMA_USER_VERSION))
 
-        tables = [r[0] for r in self.conn.execute('SELECT name FROM '
-                                                  'sqlite_master WHERE '
-                                                  'type="table"')
-                  if not r[0].startswith('_')]
+        tables = [r['name'] for r in cur.execute('select name from '
+                                                 'sqlite_master where '
+                                                 'type="table"')
+                  if not r['name'].startswith('_')]
 
         if isinstance(gtfs_url, six.binary_type):
             gtfs_url = gtfs_url.decode('utf-8')
@@ -407,17 +424,18 @@ class GTFSMixin(object):
         zip = six.BytesIO(resp.content).getvalue()
         hash = hashlib.sha256(zip).hexdigest()
 
-        count = (self.conn.execute('SELECT count(*) FROM _feeds WHERE '
-                                   'url=? AND sha256sum=?', (gtfs_url, hash))
-                 .fetchone()[0])
+        count = (next(cur.execute('select count(*) as c from _feeds where '
+                                  'url=? AND sha256sum=?',
+                                  (gtfs_url, hash)))['c'])
         if count != 1:
-            self.conn.execute('DELETE FROM _feeds WHERE url=?', (gtfs_url,))
+            cur.execute('begin transaction')
+            cur.execute('delete from _feeds where url=?', (gtfs_url,))
             for table in tables:
-                self.conn.execute(
-                    'DELETE FROM {0} WHERE _feed_url=?'.format(table),
+                cur.execute(
+                    'delete from {0} where _feed_url=?'.format(table),
                     (gtfs_url,))
-            self.conn.execute('INSERT INTO _feeds (url, sha256sum) '
-                              'VALUES (?, ?)', (gtfs_url, hash))
+            cur.execute('insert into _feeds (url, sha256sum) '
+                        'values (?, ?)', (gtfs_url, hash))
             with zipfile.ZipFile(six.BytesIO(zip)) as z:
                 for table in tables:
                     filename = table + '.txt'
@@ -427,16 +445,16 @@ class GTFSMixin(object):
                         data = CSVReader(f)
                         columns = []
                         col_types = []
-                        for x in self.conn.execute(
+                        for x in cur.execute(
                                 'pragma table_info({0})'.format(table)):
-                            if x[1] in data.header:
-                                columns.append(x[1])
-                                col_types.append(x[2])
+                            if x['name'] in data.header:
+                                columns.append(x['name'])
+                                col_types.append(x['type'])
                         # _feed_url must be at end
                         columns.append('_feed_url')
                         col_types.append('text')
 
-                        stmt = ('INSERT INTO {0} ({1}) VALUES ({2})'
+                        stmt = ('insert into {0} ({1}) values ({2})'
                                 .format(table, ', '.join(columns),
                                         ', '.join(('?',) * len(columns))))
 
@@ -449,15 +467,17 @@ class GTFSMixin(object):
                                 return None
                         row_gen = ([get(row, i) for i in range(len(columns))]
                                    for row in data)
-                        self.conn.executemany(stmt, row_gen)
-            self.conn.commit()
+                        cur.executemany(stmt, row_gen)
+            cur.execute('commit transaction')
 
             # interpolate missing stop times
-            for row in self.conn.execute(
+            cur.execute('begin transaction')
+            for row in cur.execute(
                     '''select distinct trip_id from stop_times where
                     arrival_time is null and _feed_url=?''', (self.gtfs_url,)):
+                innercur = self.conn.cursor()
                 trip_id = row['trip_id']
-                known_times = {r['seq']: dict(r) for r in self.conn.execute(
+                known_times = {r['seq']: dict(r) for r in innercur.execute(
                     '''select arrival_time as a, departure_time as d,
                     stop_sequence as seq from stop_times where trip_id=:trip_id
                     and _feed_url=:_feed_url and arrival_time is not null
@@ -466,7 +486,7 @@ class GTFSMixin(object):
                 if not known_times:
                     # this trip is headway only
                     continue
-                unknown_times = [r['stop_sequence'] for r in self.conn.execute(
+                unknown_times = [r['stop_sequence'] for r in innercur.execute(
                     '''select stop_sequence from stop_times where
                     trip_id=:trip_id and _feed_url=:_feed_url and
                     arrival_time is null order by stop_sequence asc''',
@@ -480,26 +500,24 @@ class GTFSMixin(object):
                                             unknown_times))) + 1
                     time = ((gap.total_seconds() * (i + 1) / count) +
                             start.total_seconds())
-                    self.conn.execute(
+                    innercur.execute(
                         '''update stop_times set _arrival_interpolate=:a where
                         trip_id=:trip_id and _feed_url=:_feed_url and
                         stop_sequence=:seq''',
                         {'trip_id': trip_id, '_feed_url': self.gtfs_url,
                          'a': time, 'seq': seq})
-            self.conn.commit()
-
-    def __del__(self):
-        self.conn.close()
+            cur.execute('commit transaction')
 
     def _query(self, cls, **kwargs):
         if '_feed_url' not in kwargs:
             kwargs['_feed_url'] = self.gtfs_url
-        return self.conn.execute(
-            cls._build_select(kwargs.keys(), named_params=True), kwargs)
+        cur = self.conn.cursor()
+        return cur.execute(cls._build_select(
+            kwargs.keys(), named_params=True), kwargs)
 
     def _entity_builder(self, cls, **kwargs):
-        return Queryable(cls(self, **dict(row))
-                         for row in self._query(cls))
+        query = self._query(cls, **kwargs)
+        return Queryable(cls(self, **row) for row in query)
 
     def get(self, cls, id, default=None):
         typemap = {

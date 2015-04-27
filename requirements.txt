@@ -10,3 +10,5 @@ lockfile
 phonenumbers
 # date/time library -- ASL license
 arrow
+# another python sqlite wrapper -- zlib license (or any OSI-approved license)
+apsw
