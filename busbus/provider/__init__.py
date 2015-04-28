@@ -61,6 +61,11 @@ class ProviderBase(object):
     def arrivals(self):
         """Return an iterator of the arrivals for this provider"""
 
+    @property
+    def alerts(self):
+        """Return an iterator of current alerts for this provider"""
+        return iter(())
+
     def __getitem__(self, name):
         try:
             return getattr(self, name)

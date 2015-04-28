@@ -106,6 +106,7 @@ entity_len_params = [
     ('routes', 5),
     # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
     ('arrivals', 139),
+    ('alerts', 0),
 ]
 
 

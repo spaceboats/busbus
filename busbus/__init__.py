@@ -46,6 +46,10 @@ class Engine(object):
     def arrivals(self):
         return Queryable.chain(*[p.arrivals for p in self._providers.values()])
 
+    @property
+    def alerts(self):
+        return Queryable.chain(*[p.alerts for p in self._providers.values()])
+
 
 class Agency(BaseEntity):
     __attrs__ = ('id', 'name', 'url', 'timezone', 'lang', 'phone_e164',
@@ -75,4 +79,8 @@ class Arrival(BaseEntity):
         return self.time < other.time
 
 
-ENTITIES = (Agency, Stop, Route, Arrival)
+class Alert(BaseEntity):
+    __attrs__ = ('id', 'text')
+
+
+ENTITIES = (Agency, Stop, Route, Arrival, Alert)
