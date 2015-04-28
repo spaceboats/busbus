@@ -8,6 +8,7 @@ from busbus.util.csv import CSVReader
 
 import apsw
 import arrow
+import collections
 import datetime
 import hashlib
 import heapq
@@ -48,18 +49,14 @@ def date_to_sql_string(datestr):
     return '-'.join((datestr[:4], datestr[4:6], datestr[6:]))
 
 
-def fix_type(value, typename):
-    """
-    Functions that map data from the GTFS CSV files to the SQLite database
-    based on column type.
-    """
-    return {
-        'date': date_to_sql_string,
-        'gtfstime': parse_gtfs_time,
-        'integer': int,
-        'real': float,
-        'timedelta': int,
-    }.get(typename, lambda s: s)(value) if value else None
+FIX_TYPE_MAP = {
+    'date': date_to_sql_string,
+    'gtfstime': parse_gtfs_time,
+    'integer': int,
+    'real': float,
+    'timedelta': int,
+    'text': lambda s: s,
+}
 
 
 class SQLEntityMixin(object):
@@ -444,30 +441,28 @@ class GTFSMixin(object):
                     with z.open(filename) as f:
                         data = CSVReader(f)
                         columns = []
-                        col_types = []
+                        coldata = []
                         for x in cur.execute(
                                 'pragma table_info({0})'.format(table)):
                             if x['name'] in data.header:
                                 columns.append(x['name'])
-                                col_types.append(x['type'])
+                                coldata.append((
+                                    x['type'], data.header.index(x['name'])))
                         # _feed_url must be at end
                         columns.append('_feed_url')
-                        col_types.append('text')
 
                         stmt = ('insert into {0} ({1}) values ({2})'
                                 .format(table, ', '.join(columns),
                                         ', '.join(('?',) * len(columns))))
 
-                        def get(row, i):
-                            if columns[i] == '_feed_url':
-                                return gtfs_url
-                            elif i < len(row):
-                                return fix_type(row[i], col_types[i])
-                            else:
-                                return None
-                        row_gen = ([get(row, i) for i in range(len(columns))]
-                                   for row in data)
-                        cur.executemany(stmt, row_gen)
+                        def row_gen(row):
+                            for t, idx in coldata:
+                                if idx < len(row) and row[idx] is not None:
+                                    yield FIX_TYPE_MAP[t](row[idx])
+                                else:
+                                    yield None
+                            yield gtfs_url
+                        cur.executemany(stmt, (row_gen(row) for row in data))
             cur.execute('commit transaction')
 
             # interpolate missing stop times
