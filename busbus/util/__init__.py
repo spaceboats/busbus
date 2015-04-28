@@ -1,8 +1,11 @@
 from abc import ABCMeta, abstractmethod
 import collections
+from datetime import datetime, timedelta
 import math
 import os
+import requests
 import six
+import time
 
 import busbus.entity
 
@@ -42,6 +45,36 @@ class Config(collections.defaultdict):
             return os.path.join(self['busbus_dir'], 'gtfs.sqlite3')
         else:
             raise KeyError(key)
+
+
+class RateLimitRequests(requests.Session):
+    """
+    requests.Session subclass that implements rate limiting, both for all
+    requests on this session as well as separate rate limits for each
+    individual request.
+    """
+
+    def __init__(self, interval=0, url_interval=0):
+        self._cache = {}
+        self._last_request = datetime.min
+        self._interval = timedelta(seconds=interval)
+        self._url_interval = timedelta(seconds=url_interval)
+
+        super(RateLimitRequests, self).__init__()
+
+    def request(self, *args, **kwargs):
+        key = freezehash((args, kwargs))
+        if key in self._cache:
+            t, resp = self._cache[key]
+            if datetime.now() - t <= self._url_interval:
+                return resp
+        time.sleep(max((self._last_request + self._interval -
+                        datetime.now()).total_seconds(), 0))
+        resp = super(RateLimitRequests, self).request(*args, **kwargs)
+        t = datetime.now()
+        self._cache[key] = (t, resp)
+        self._last_request = t
+        return resp
 
 
 def entity_type(obj):
