@@ -1,13 +1,24 @@
 import busbus
 from busbus.provider.lawrenceks import LawrenceTransitProvider
+from .conftest import mock_gtfs_zip
 
 import arrow
 import pytest
+import responses
 
 
 @pytest.fixture(scope='module')
+@responses.activate
 def lawrenceks_provider(engine):
+    responses.add(responses.GET, LawrenceTransitProvider.gtfs_url,
+                  body=mock_gtfs_zip('lawrenceks'), status=200,
+                  content_type='application/zip')
     return LawrenceTransitProvider(engine)
+
+
+# test that we are indeed using our local abridged copy of the GTFS feed
+def test_len_routes(lawrenceks_provider):
+    assert len(list(lawrenceks_provider.routes)) == 1
 
 
 def test_agency_phone_e164(lawrenceks_provider):

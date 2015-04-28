@@ -1,17 +1,22 @@
 # coding=utf-8
 
 import busbus.web
-from .conftest import SampleGTFSProvider
+from .conftest import SampleGTFSProvider, mock_gtfs_zip
 
 import cherrypy
 import pytest
+import responses
 import requests
 from wsgi_intercept import requests_intercept, add_wsgi_intercept
 
 
 @pytest.fixture(scope='module')
+@responses.activate
 def url_prefix(request, engine_config):
     engine = busbus.web.Engine(engine_config)
+    responses.add(responses.GET, SampleGTFSProvider.gtfs_url,
+                  body=mock_gtfs_zip('_sample'), status=200,
+                  content_type='application/zip')
     SampleGTFSProvider(engine)
 
     # https://cherrypy.readthedocs.org/en/latest/deploy.html

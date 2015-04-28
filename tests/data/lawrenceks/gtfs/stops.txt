@@ -1,0 +1,17 @@
+stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding
+11TH_INDIANA_SB,357,11th & Indiana,West side of Indiana south of 11th,38.96363964,-95.24303824,FULL,,,,,
+15TH_GREENHALL_EB,371,15th & Green Hall,South side of 15th east of Green Hall,38.95698175,-95.25326677,FREE,http://www.ku.edu/,,,,1
+15TH_SPAHR_WB,369,Engineering,North side of 15th in front of Spahr Engineering Library,38.9571515,-95.25382308,FREE,http://www.ku.edu/,,,,1
+15TH_TOWERS_EB,370,Jayhawker Towers,South side of 15th east of Jayhawk Towers,38.95697812,-95.25510818,FREE,http://www.ku.edu/,,,,1
+BAILEY_HALL_WB,373,Bailey Hall westbound,North side of Jayhawk Blvd in front of Bailey Hall,38.9575748,-95.24642194,FREE,http://www.ku.edu/,,,,1
+FRASER_EB,168,Jayhawk Blvd @ Fraser,South side of Jayhawk Blvd north of Fraser Hall,38.95767058,-95.24388582,FREE,http://www.ku.edu/,,,,1
+GSP,277,GSP & Corbin,North side of circle drive in front of GSP Residence Hall,38.96492432,-95.24187952,FREE,http://www.ku.edu/,,,,1
+HASH_NB,381,Hashinger Hall,East side of NEW Engel Rd @ Hashinger Hall north of Irving Hill Rd ,38.953739,-95.259472,FREE,http://www.ku.edu/,,,,1
+JAYH_BUDIGWESC_EB,456,Jayhawk Blvd @ Budig,South side of Jayhawk Blvd between Budig and Wescoe Halls,38.95810441,-95.2486065,FREE,http://www.ku.edu/,,,,1
+JAYH_STAUFLINT_EB,,Jayhawk Blvd @ Stauffer-Flint Hall,South side of Jayhawk Blvd east of Wescoe @ KUOW shelter,38.95740812,-95.2462279,FREE,http://www.ku.edu/,,,,1
+KANSAS_UNION_NB,171,Kansas Union,East side of Jayhawk Blvd across the street from the Kansas Union,38.959337,-95.242965,FREE,http://www.ku.edu/,,,,1
+KANSAS_UNION_SB,173,Kansas Union,West side of Jayhawk Blvd in front of Kansas Union,38.959442,-95.243046,FREE,http://www.ku.edu/,,,,1
+LEWIS_NB,380,Lewis Hall,East side of NEW Engel Rd @ north end of Lewis Hall,38.955769,-95.258363,FREE,http://www.ku.edu/,,,,1
+LIPP_WB,166,Jayhawk Blvd @ Lippincott,North side of Jayhawk Blvd in front of Lippincott Hall,38.95769978,-95.24411112,FREE,http://www.ku.edu/,,,,1
+MCCOLLUM,275,McCollum Hall,South end of parking lot 104 @ Mccollum,38.952235,-95.25949091,FREE,http://www.ku.edu/,,,,1
+SNOW_HALL_WB,455,Snow Hall westbound,North side of Jayhawk Blvd in front of Snow Hall,38.95857673,-95.24928546,FREE,http://www.ku.edu/,,,,1
