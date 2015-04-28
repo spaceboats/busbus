@@ -38,6 +38,8 @@ class Config(collections.defaultdict):
                 return os.path.join(os.getcwd(), '.busbus')
         elif key == 'url_cache_dir':
             return os.path.join(self['busbus_dir'], 'cache')
+        elif key == 'gtfs_db_path':
+            return os.path.join(self['busbus_dir'], 'gtfs.sqlite3')
         else:
             raise KeyError(key)
 

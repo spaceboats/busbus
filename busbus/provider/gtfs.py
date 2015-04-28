@@ -389,10 +389,7 @@ class GTFSMixin(object):
     def __init__(self, engine, gtfs_url):
         super(GTFSMixin, self).__init__(engine)
 
-        db_path = self.engine.config.get(
-            'gtfs_db_path',
-            os.path.join(self.engine.config['busbus_dir'], 'gtfs.sqlite3'))
-        self.conn = apsw.Connection(db_path)
+        self.conn = apsw.Connection(self.engine.config['gtfs_db_path'])
         self.conn.setrowtrace(gtfs_row_tracer)
         cur = self.conn.cursor()
 
