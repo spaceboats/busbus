@@ -1,5 +1,6 @@
 from busbus.provider import ProviderBase
 from busbus.provider.gtfs import GTFSMixin
+from busbus.util import RateLimitRequests
 
 
 class MBTAProvider(GTFSMixin, ProviderBase):
@@ -25,13 +26,12 @@ class MBTAProvider(GTFSMixin, ProviderBase):
     credit_url = 'http://www.massdot.state.ma.us'
     country = 'US'
 
-    # Lowering this number may cause you to be suspended from the data feed
-    # (API docs, "Use of MBTA data"). This number is in seconds. The actual
-    # value required by the MBTA is 10 seconds.
-    poll_interval = 12
-
     gtfs_url = "http://www.mbta.com/uploadedfiles/MBTA_GTFS.zip"
 
     def __init__(self, mbta_api_key, engine=None):
         super(MBTAProvider, self).__init__(engine, self.gtfs_url)
         self.mbta_api_key = mbta_api_key
+
+        # MBTA requires that "the same polling command" is not to be called
+        # more often than every 10 seconds (API docs, "Use of MBTA data").
+        self._requests = RateLimitRequests(url_interval=10)

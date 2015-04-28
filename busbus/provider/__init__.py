@@ -13,10 +13,6 @@ import uuid
 @six.add_metaclass(ABCMeta)
 class ProviderBase(object):
 
-    # Defines the minimum polling interval. Many transit data providers define
-    # a minimum polling interval. Defaults to 30 seconds.
-    poll_interval = 30
-
     def __init__(self, engine, **kwargs):
         self.id = hashlib.sha1(six.b(
             '{0}:{1!r}'.format(clsname(self), kwargs.get('__init_args__', {}))
