@@ -18,7 +18,7 @@ class LazyEntityProperty(object):
         return self.f(*self.args, **self.kwargs)
 
 
-class BaseEntity(object):
+class BaseEntity(collections.Mapping):
     __repr_attrs__ = ('id',)
     __derived__ = False
 
@@ -54,14 +54,18 @@ class BaseEntity(object):
     def __getitem__(self, name):
         try:
             return getattr(self, name)
-        except AttributeError:
+        except (AttributeError, TypeError):
             raise KeyError(name)
 
-    def keys(self):
+    def __iter__(self):
         yield 'provider'
         for attr in self.__attrs__:
             if getattr(self, attr, None) is not None:
                 yield attr
+
+    def __len__(self):
+        return 1 + sum([1 for attr in self.__attrs__
+                        if getattr(self, attr, None) is not None])
 
 
 class BaseEntityJSONEncoder(json.JSONEncoder):

@@ -10,8 +10,8 @@ from wsgi_intercept import requests_intercept, add_wsgi_intercept
 
 
 @pytest.fixture(scope='module')
-def url_prefix(request):
-    engine = busbus.web.Engine()
+def url_prefix(request, engine_config):
+    engine = busbus.web.Engine(engine_config)
     SampleGTFSProvider(engine)
 
     # https://cherrypy.readthedocs.org/en/latest/deploy.html
@@ -82,6 +82,10 @@ def test_query(url_prefix):
 def test_unexpand_none(url_prefix):
     data, resp = get(url_prefix + 'routes')
     assert set(data['routes'][0]['agency'].keys()) == set(['id'])
+
+
+def test_unexpand_dict():
+    assert busbus.web.unexpand({1: 2}, ()) == {1: 2}
 
 
 def test_unexpand_agencies(url_prefix):

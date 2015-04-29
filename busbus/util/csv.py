@@ -27,5 +27,7 @@ class CSVReader(util.Iterable):
     def __next__(self):
         row = next(self.reader)
         if six.PY2:
-            row = (x.decode('utf-8') for x in row)
-        return six.moves.zip(self.header, row)
+            func = lambda x: x.decode('utf-8') if x else None
+        else:
+            func = lambda x: x if x else None
+        return [func(x) for x in row]

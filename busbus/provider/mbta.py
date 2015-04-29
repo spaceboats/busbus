@@ -32,6 +32,6 @@ class MBTAProvider(GTFSMixin, ProviderBase):
 
     gtfs_url = "http://www.mbta.com/uploadedfiles/MBTA_GTFS.zip"
 
-    def __init__(self, engine, mbta_api_key):
+    def __init__(self, mbta_api_key, engine=None):
         super(MBTAProvider, self).__init__(engine, self.gtfs_url)
         self.mbta_api_key = mbta_api_key

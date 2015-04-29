@@ -58,7 +58,7 @@ class Stop(BaseEntity):
 
     @property
     def children(self):
-        return self._provider.stops.where(lambda s: s.parent == self)
+        return self.provider.stops.where(lambda s: s.parent == self)
 
 
 class Route(BaseEntity):
@@ -70,6 +70,9 @@ class Arrival(BaseEntity):
     __attrs__ = ('route', 'stop', 'time', 'departure_time', 'headsign',
                  'short_name', 'bikes_ok')
     __repr_attrs__ = ('route', 'stop', 'time')
+
+    def __lt__(self, other):
+        return self.time < other.time
 
 
 ENTITIES = (Agency, Stop, Route, Arrival)
