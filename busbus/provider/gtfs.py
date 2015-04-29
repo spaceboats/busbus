@@ -181,17 +181,17 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
     def directions(self):
         hashes = []
         t_query = """select trip_headsign, trip_short_name, bikes_allowed,
-        trip_id from trips where route_id=:route_id and _feed_url=:_feed_url"""
-        t_filter = {'route_id': self.id, '_feed_url': self.provider.gtfs_url}
+        trip_id from trips where route_id=:route_id and _feed=:_feed"""
+        t_filter = {'route_id': self.id, '_feed': self.provider.feed_id}
         cur = self.provider.conn.cursor()
         for trip in cur.execute(t_query, t_filter):
             direction = {}
             innercur = self.provider.conn.cursor()
             result = innercur.execute(
                 """select s.* from stop_times as st join stops as s
-                on st.stop_id=s.stop_id and st._feed_url=s._feed_url
-                where st.trip_id=:t_id and st._feed_url=:_feed_url""",
-                {'t_id': trip['trip_id'], '_feed_url': self.provider.gtfs_url})
+                on st.stop_id=s.stop_id and st._feed=s._feed
+                where st.trip_id=:t_id and st._feed=:_feed""",
+                {'t_id': trip['trip_id'], '_feed': self.provider.feed_id})
             direction['stops'] = [GTFSStop(self.provider, **dict(row))
                                   for row in result]
             if trip['trip_headsign'] is not None:
@@ -231,15 +231,15 @@ class ArrivalIterator(util.Iterable):
                 coalesce(st.arrival_time, st._arrival_interpolate) as arr,
                 departure_time, st.trip_id as trip_id
             from trips_v as t join stop_times as st on
-                t.trip_id=st.trip_id and t._feed_url=st._feed_url
+                t.trip_id=st.trip_id and t._feed=st._feed
             where route_id=:route_id and stop_id=:stop_id and
-                t._feed_url=:_feed_url order by arrival_time asc"""
+                t._feed=:_feed order by arrival_time asc"""
             iters = []
             cur = self.provider.conn.cursor()
             for stop, route in itertools.product(self.stops, self.routes):
                 for stop_time in cur.execute(st_query, {
                         'route_id': route.id, 'stop_id': stop.id,
-                        '_feed_url': self.provider.gtfs_url}):
+                        '_feed': self.provider.feed_id}):
                     iters.append(self._build_arrivals(stop, route, stop_time))
             self.it = heapq.merge(*iters)
         return next(self.it)
@@ -298,8 +298,8 @@ class ArrivalIterator(util.Iterable):
         if trip_id not in self.freq_cache:
             query = """select start_time, end_time, headway_secs
             from frequencies where trip_id=:trip_id and
-            _feed_url=:_feed_url order by start_time asc"""
-            filter = {'trip_id': trip_id, '_feed_url': self.provider.gtfs_url}
+            _feed=:_feed order by start_time asc"""
+            filter = {'trip_id': trip_id, '_feed': self.provider.feed_id}
             cur = self.provider.conn.cursor()
             self.freq_cache[trip_id] = cur.execute(query, filter).fetchall()
         return self.freq_cache[trip_id]
@@ -308,14 +308,13 @@ class ArrivalIterator(util.Iterable):
         if id not in self.service_cache:
             c_query = """select start_date, end_date, monday, tuesday,
             wednesday, thursday, friday, saturday, sunday from calendar
-            where service_id=:service_id and _feed_url=:_feed_url"""
-            c_filter = {'service_id': id,
-                        '_feed_url': self.provider.gtfs_url}
+            where service_id=:service_id and _feed=:_feed"""
+            c_filter = {'service_id': id, '_feed': self.provider.feed_id}
             cur = self.provider.conn.cursor()
             self.service_cache[id] = dict(next(cur.execute(c_query, c_filter)))
 
             cd_query = """select date, exception_type as e from calendar_dates
-            where service_id=:service_id and _feed_url=:_feed_url"""
+            where service_id=:service_id and _feed=:_feed"""
             cd_result = cur.execute(cd_query, c_filter)
             self.service_cache[id]['exceptions'] = {r['date']: r['e']
                                                     for r in cd_result}
@@ -389,7 +388,10 @@ class GTFSMixin(object):
     def __init__(self, engine, gtfs_url):
         super(GTFSMixin, self).__init__(engine)
 
-        self.conn = apsw.Connection(self.engine.config['gtfs_db_path'])
+        if isinstance(self.engine.config['gtfs_db_path'], apsw.Connection):
+            self.conn = self.engine.config['gtfs_db_path']
+        else:
+            self.conn = apsw.Connection(self.engine.config['gtfs_db_path'])
         self.conn.setrowtrace(gtfs_row_tracer)
         cur = self.conn.cursor()
 
@@ -413,23 +415,27 @@ class GTFSMixin(object):
 
         if isinstance(gtfs_url, six.binary_type):
             gtfs_url = gtfs_url.decode('utf-8')
-        self.gtfs_url = gtfs_url
         resp = self._cached_requests.get(gtfs_url)
         zip = six.BytesIO(resp.content).getvalue()
         hash = hashlib.sha256(zip).hexdigest()
 
-        count = (next(cur.execute('select count(*) as c from _feeds where '
-                                  'url=? AND sha256sum=?',
-                                  (gtfs_url, hash)))['c'])
-        if count != 1:
+        resp = [x['id'] for x in cur.execute(
+            'select id from _feeds where url=? AND sha256sum=?',
+            (gtfs_url, hash))]
+        if len(resp) == 1:
+            self.feed_id = resp[0]
+        else:
             cur.execute('begin transaction')
-            cur.execute('delete from _feeds where url=?', (gtfs_url,))
+            old_ids = [(x['id'],) for x in cur.execute(
+                '''select id from _feeds where url=?''', (gtfs_url,))]
+            cur.executemany('delete from _feeds where id=?', old_ids)
             for table in tables:
-                cur.execute(
-                    'delete from {0} where _feed_url=?'.format(table),
-                    (gtfs_url,))
+                cur.executemany('delete from {0} where _feed=?'.format(table),
+                                old_ids)
+
             cur.execute('insert into _feeds (url, sha256sum) '
                         'values (?, ?)', (gtfs_url, hash))
+            self.feed_id = self.conn.last_insert_rowid()
             with zipfile.ZipFile(six.BytesIO(zip)) as z:
                 for table in tables:
                     filename = table + '.txt'
@@ -445,8 +451,8 @@ class GTFSMixin(object):
                                 columns.append(x['name'])
                                 coldata.append((
                                     x['type'], data.header.index(x['name'])))
-                        # _feed_url must be at end
-                        columns.append('_feed_url')
+                        # _feed must be at end
+                        columns.append('_feed')
 
                         stmt = ('insert into {0} ({1}) values ({2})'
                                 .format(table, ', '.join(columns),
@@ -458,7 +464,7 @@ class GTFSMixin(object):
                                     yield FIX_TYPE_MAP[t](row[idx])
                                 else:
                                     yield None
-                            yield gtfs_url
+                            yield self.feed_id
                         cur.executemany(stmt, (row_gen(row) for row in data))
             cur.execute('commit transaction')
 
@@ -466,23 +472,23 @@ class GTFSMixin(object):
             cur.execute('begin transaction')
             for row in cur.execute(
                     '''select distinct trip_id from stop_times where
-                    arrival_time is null and _feed_url=?''', (self.gtfs_url,)):
+                    arrival_time is null and _feed=?''', (self.feed_id,)):
                 innercur = self.conn.cursor()
                 trip_id = row['trip_id']
                 known_times = {r['seq']: dict(r) for r in innercur.execute(
                     '''select arrival_time as a, departure_time as d,
                     stop_sequence as seq from stop_times where trip_id=:trip_id
-                    and _feed_url=:_feed_url and arrival_time is not null
+                    and _feed=:_feed and arrival_time is not null
                     order by stop_sequence asc''',
-                    {'trip_id': trip_id, '_feed_url': self.gtfs_url})}
+                    {'trip_id': trip_id, '_feed': self.feed_id})}
                 if not known_times:
                     # this trip is headway only
                     continue
                 unknown_times = [r['stop_sequence'] for r in innercur.execute(
                     '''select stop_sequence from stop_times where
-                    trip_id=:trip_id and _feed_url=:_feed_url and
+                    trip_id=:trip_id and _feed=:_feed and
                     arrival_time is null order by stop_sequence asc''',
-                    {'trip_id': trip_id, '_feed_url': self.gtfs_url})]
+                    {'trip_id': trip_id, '_feed': self.feed_id})]
                 for i, seq in enumerate(unknown_times):
                     left = max(filter(lambda k: k < seq, known_times))
                     right = min(filter(lambda k: k > seq, known_times))
@@ -494,15 +500,15 @@ class GTFSMixin(object):
                             start.total_seconds())
                     innercur.execute(
                         '''update stop_times set _arrival_interpolate=:a where
-                        trip_id=:trip_id and _feed_url=:_feed_url and
+                        trip_id=:trip_id and _feed=:_feed and
                         stop_sequence=:seq''',
-                        {'trip_id': trip_id, '_feed_url': self.gtfs_url,
+                        {'trip_id': trip_id, '_feed': self.feed_id,
                          'a': time, 'seq': seq})
             cur.execute('commit transaction')
 
     def _query(self, cls, **kwargs):
-        if '_feed_url' not in kwargs:
-            kwargs['_feed_url'] = self.gtfs_url
+        if '_feed' not in kwargs:
+            kwargs['_feed'] = self.feed_id
         cur = self.conn.cursor()
         return cur.execute(cls._build_select(
             kwargs.keys(), named_params=True), kwargs)

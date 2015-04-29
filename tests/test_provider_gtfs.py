@@ -3,10 +3,12 @@ from .conftest import SampleGTFSProvider
 import busbus
 from busbus.provider import ProviderBase
 from busbus.provider.gtfs import SQLEntityMixin
+from busbus.util import Config
 
 import arrow
 from collections import OrderedDict
 import datetime
+import mock
 import pytest
 import six
 
@@ -34,6 +36,18 @@ def test_provider_without_engine():
             raise NotImplementedError
 
     TestProvider(None)
+
+
+def test_default_gtfs_db_path():
+    c = Config({'busbus_dir': '/tmp/busbus'})
+    assert c['gtfs_db_path'] == '/tmp/busbus/gtfs.sqlite3'
+
+
+def test_already_imported(provider):
+    e = busbus.Engine({'gtfs_db_path': provider.conn})
+    p = SampleGTFSProvider(e)
+    assert provider.feed_id == p.feed_id
+    assert len(list(provider.agencies)) == 1
 
 
 def test_engine_has_one_provider(engine, provider):
