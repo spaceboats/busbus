@@ -1,0 +1,4 @@
+"stop_id","stop_code","stop_name","stop_desc","stop_lat","stop_lon","zone_id","stop_url","location_type","parent_station","wheelchair_boarding"
+"place-bucen","","Boston Univ. Central","","42.350082","-71.106865","","",1,"",1
+"70144","70144","Boston Univ Central - Inbound",,"42.350082","-71.106865",,,0,"place-bucen",0
+"70145","70145","Boston Univ Central - Outbound",,"42.350082","-71.106865",,,0,"place-bucen",0
