@@ -151,7 +151,8 @@ class GTFSStop(SQLEntityMixin, busbus.Stop):
     @property
     def children(self):
         result = self._query(parent_station=self.id)
-        return Queryable(GTFSStop(**dict(row)) for row in result)
+        return Queryable(GTFSStop(self.provider, **dict(row))
+                         for row in result)
 
 
 class GTFSRoute(SQLEntityMixin, busbus.Route):
