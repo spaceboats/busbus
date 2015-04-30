@@ -4,3 +4,4 @@ coverage
 python-coveralls
 wsgi_intercept
 mock
+responses

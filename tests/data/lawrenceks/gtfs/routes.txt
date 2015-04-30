@@ -1,0 +1,2 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color
+RT_43,KULTS,43,Campus Red Circulator,"""Route 43 is a circulator route at KU that connects Daisy Hill and GSP/Corbin with Jayhawk Boulevard.""",3,,CC0000,FFFFFF

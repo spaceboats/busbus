@@ -3,23 +3,39 @@ from busbus.provider import ProviderBase
 from busbus.provider.gtfs import GTFSMixin
 
 import arrow
+import contextlib
 try:
     # prefer the stdlib version of mock (>= 3.3)
     import unittest.mock as mock
 except ImportError:
     import mock
+import os
+from pkg_resources import resource_listdir, resource_string
 import pytest
+import responses
+import six
+import zipfile
+
+
+def mock_gtfs_zip(name):
+    path = os.path.join('data', name, 'gtfs')
+    with contextlib.closing(six.BytesIO()) as zipdata:
+        with zipfile.ZipFile(zipdata, 'w') as z:
+            for filename in resource_listdir(__name__, path):
+                s = resource_string(__name__, os.path.join(path, filename))
+                z.writestr(filename, s)
+        return zipdata.getvalue()
 
 
 class SampleGTFSProvider(GTFSMixin, ProviderBase):
+    gtfs_url = ('https://developers.google.com/transit/gtfs/examples/'
+                'sample-feed.zip')
 
     def __init__(self, engine=None):
         # https://developers.google.com/transit/gtfs/examples/gtfs-feed
         # FIXME We should eventually roll our own GTFS feed as well in order to
         # test everything
-        gtfs_url = ('https://developers.google.com/transit/gtfs/examples/'
-                    'sample-feed.zip')
-        super(SampleGTFSProvider, self).__init__(engine, gtfs_url)
+        super(SampleGTFSProvider, self).__init__(engine, self.gtfs_url)
 
     @property
     def arrivals(self):
@@ -42,5 +58,9 @@ def engine(engine_config):
 
 
 @pytest.fixture(scope='session')
+@responses.activate
 def provider(engine):
+    responses.add(responses.GET, SampleGTFSProvider.gtfs_url,
+                  body=mock_gtfs_zip('_sample'), status=200,
+                  content_type='application/zip')
     return SampleGTFSProvider(engine)
