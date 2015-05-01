@@ -224,25 +224,23 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
         self.freq_cache = {}
         self.it = None
 
-    def __next__(self):
-        if self.it is None:
-            st_query = """select distinct min_arrival_time, service_id,
-                trip_headsign, trip_short_name, bikes_allowed,
-                coalesce(st.arrival_time, st._arrival_interpolate) as arr,
-                departure_time, st.trip_id as trip_id
-            from trips_v as t join stop_times as st on
-                t.trip_id=st.trip_id and t._feed=st._feed
-            where route_id=:route_id and stop_id=:stop_id and
-                t._feed=:_feed order by arrival_time asc"""
-            iters = []
-            cur = self.provider.conn.cursor()
-            for stop, route in itertools.product(self.stops, self.routes):
-                for stop_time in cur.execute(st_query, {
-                        'route_id': route.id, 'stop_id': stop.id,
-                        '_feed': self.provider.feed_id}):
-                    iters.append(self._build_arrivals(stop, route, stop_time))
-            self.it = heapq.merge(*iters)
-        return next(self.it)
+    def _build_iterable(self):
+        st_query = """select distinct min_arrival_time, service_id,
+            trip_headsign, trip_short_name, bikes_allowed,
+            coalesce(st.arrival_time, st._arrival_interpolate) as arr,
+            departure_time, st.trip_id as trip_id
+        from trips_v as t join stop_times as st on
+            t.trip_id=st.trip_id and t._feed=st._feed
+        where route_id=:route_id and stop_id=:stop_id and
+            t._feed=:_feed order by arrival_time asc"""
+        iters = []
+        cur = self.provider.conn.cursor()
+        for stop, route in itertools.product(self.stops, self.routes):
+            for stop_time in cur.execute(st_query, {
+                    'route_id': route.id, 'stop_id': stop.id,
+                    '_feed': self.provider.feed_id}):
+                iters.append(self._build_arrivals(stop, route, stop_time))
+        return heapq.merge(*iters)
 
     def _build_arrivals(self, stop, route, stop_time):
         def build_arr(day, offset=None):

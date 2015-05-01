@@ -21,6 +21,7 @@ class ArrivalGeneratorBase(util.Iterable):
                       else arrow.get(start)).to(provider._timezone)
         self.end = (self.start.replace(hours=3) if end is None
                     else arrow.get(end)).to(provider._timezone)
+        self.it = None
 
     @abstractproperty
     def realtime(self):
@@ -36,8 +37,18 @@ class ArrivalGeneratorBase(util.Iterable):
         """
 
     @abstractmethod
+    def _build_iterable(self):
+        """
+        Build an iterator that provides arrivals.
+
+        This is done in a separate function rather than in __init__ so that
+        this generator can be lazily evaluated.
+        """
+
     def __next__(self):
-        """Provide the next arrival."""
+        if self.it is None:
+            self.it = self._build_iterable()
+        return next(self.it)
 
 
 class ArrivalQueryable(Queryable):
