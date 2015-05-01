@@ -27,9 +27,11 @@ def test_agency_phoneword_e164(mbta_provider):
 
 
 def test_bu_central_children(mbta_provider):
-    children = set(s.id for s in mbta_provider.get(
-        busbus.Stop, u'place-bucen').children)
-    assert children == set((u'70144', u'70145'))
+    children = list(mbta_provider.get(busbus.Stop, u'place-bucen').children)
+    ids = set(c.id for c in children)
+    assert ids == set((u'70144', u'70145'))
+    for child in children:
+        assert child.parent.id == u'place-bucen'
 
 
 def test_green_to_bu(mbta_provider):
