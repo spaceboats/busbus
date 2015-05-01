@@ -10,6 +10,7 @@ from collections import OrderedDict
 import datetime
 import mock
 import pytest
+import responses
 import six
 
 
@@ -43,9 +44,18 @@ def test_default_gtfs_db_path():
     assert c['gtfs_db_path'] == '/tmp/busbus/gtfs.sqlite3'
 
 
-def test_already_imported(provider):
+@responses.activate
+def test_already_imported(provider, gtfs_zip_data):
+    assert len(list(provider.conn.cursor().execute(
+        'select id from _feeds'))) == 1
     e = busbus.Engine({'gtfs_db_path': provider.conn})
+
+    responses.add(responses.GET, SampleGTFSProvider.gtfs_url,
+                  body=gtfs_zip_data, status=200,
+                  content_type='application/zip')
     p = SampleGTFSProvider(e)
+
+    assert provider.conn is p.conn
     assert provider.feed_id == p.feed_id
     assert len(list(provider.agencies)) == 1
 

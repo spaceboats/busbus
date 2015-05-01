@@ -58,9 +58,14 @@ def engine(engine_config):
 
 
 @pytest.fixture(scope='session')
+def gtfs_zip_data():
+    return mock_gtfs_zip('_sample')
+
+
+@pytest.fixture(scope='session')
 @responses.activate
-def provider(engine):
+def provider(engine, gtfs_zip_data):
     responses.add(responses.GET, SampleGTFSProvider.gtfs_url,
-                  body=mock_gtfs_zip('_sample'), status=200,
+                  body=gtfs_zip_data, status=200,
                   content_type='application/zip')
     return SampleGTFSProvider(engine)
