@@ -24,12 +24,26 @@ def test_queryable_where_manyfunc():
 def test_queryable_where_kwargs(provider):
     q = provider.agencies.where(id='DTA')
     assert len(list(q)) == 1
+    q = provider.agencies.where(id='The weather in London')
+    with pytest.raises(StopIteration):
+        next(q)
 
 
 def test_queryable_where_none():
     q = Queryable(range(10))
     q_prime = q.where()
     assert q is q_prime
+
+
+def test_queryable_dict_obj_kwargs():
+    q = Queryable({'id': x, 'odd': bool(x % 2)} for x in range(10))
+    assert next(q.where(odd=True))['id'] == 1
+
+
+def test_queryable_unknown_obj_kwargs():
+    q = Queryable(range(10)).where(qwerty='uiop')
+    with pytest.raises(StopIteration):
+        next(q)
 
 
 @pytest.fixture(scope='function')

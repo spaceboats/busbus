@@ -357,14 +357,9 @@ class GTFSArrivalQueryable(Queryable):
 
         it = ArrivalIterator(provider, stops, routes, start_time, end_time)
         super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
-        self.kwargs = kwargs
 
-    def where(self, query_func=None, **kwargs):
-        new_funcs = (self.query_funcs + (query_func,) if query_func else
-                     self.query_funcs)
-        new_kwargs = self.kwargs.copy()
-        new_kwargs.update(kwargs)
-        return GTFSArrivalQueryable(self.provider, new_funcs, **new_kwargs)
+    def _new(self, query_funcs, kwargs):
+        return GTFSArrivalQueryable(self.provider, query_funcs, **kwargs)
 
 
 def gtfs_row_tracer(cur, row):
