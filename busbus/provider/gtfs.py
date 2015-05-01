@@ -4,6 +4,7 @@ import busbus
 import busbus.entity
 from busbus.queryable import Queryable
 from busbus import util
+from busbus.util.arrivals import ArrivalQueryable, ArrivalGeneratorBase
 from busbus.util.csv import CSVReader
 
 import apsw
@@ -207,20 +208,11 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
                 yield direction
 
 
-class ArrivalIterator(util.Iterable):
-    """
-    Private class to build arrivals, in order of arrival time, given a list of
-    stops and routes.
-    """
+class GTFSArrivalGenerator(ArrivalGeneratorBase):
 
     def __init__(self, provider, stops, routes, start, end):
-        self.provider = provider
-        self.stops = stops
-        self.routes = routes
-        self.start = (arrow.now() if start is None
-                      else arrow.get(start)).to(provider._timezone)
-        self.end = (self.start.replace(hours=3) if end is None
-                    else arrow.get(end)).to(provider._timezone)
+        super(GTFSArrivalGenerator, self).__init__(provider, stops, routes,
+                                                   start, end)
         self.service_cache = {}
         self.freq_cache = {}
         self.it = None
@@ -320,46 +312,6 @@ class ArrivalIterator(util.Iterable):
             self.service_cache[id]['exceptions'] = {r['date']: r['e']
                                                     for r in cd_result}
         return self.service_cache[id]
-
-
-class GTFSArrivalQueryable(Queryable):
-    """
-    Private class to build the GTFSMixin.arrivals Queryable.
-    """
-
-    def __init__(self, provider, query_funcs=None, **kwargs):
-        self.provider = provider
-
-        if 'stop' in kwargs:
-            stops = [kwargs.pop('stop')]
-        elif 'stop.id' in kwargs:
-            stop = provider.get(busbus.Stop, kwargs.pop('stop.id'), None)
-            stops = [] if stop is None else [stop]
-        else:
-            stops = provider.stops
-
-        if 'route' in kwargs:
-            routes = [kwargs.pop('route')]
-        elif 'route.id' in kwargs:
-            route = provider.get(busbus.Route, kwargs.pop('route.id'), None)
-            routes = [] if route is None else [route]
-        else:
-            routes = provider.routes
-
-        for attr in ('start_time', 'end_time'):
-            if attr in kwargs:
-                if isinstance(kwargs[attr], datetime.datetime):
-                    kwargs[attr] = arrow.Arrow.fromdatetime(kwargs[attr])
-                elif isinstance(kwargs[attr], datetime.date):
-                    kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
-        start_time = kwargs.pop('start_time', None)
-        end_time = kwargs.pop('end_time', None)
-
-        it = ArrivalIterator(provider, stops, routes, start_time, end_time)
-        super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
-
-    def _new(self, query_funcs, kwargs):
-        return GTFSArrivalQueryable(self.provider, query_funcs, **kwargs)
 
 
 def gtfs_row_tracer(cur, row):
@@ -549,4 +501,4 @@ class GTFSMixin(object):
 
     @property
     def arrivals(self):
-        return GTFSArrivalQueryable(self)
+        return ArrivalQueryable(self, GTFSArrivalGenerator)
