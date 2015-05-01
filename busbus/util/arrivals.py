@@ -2,9 +2,11 @@ import busbus
 from busbus.queryable import Queryable
 from busbus import util
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
 import arrow
+import collections
 import datetime
+import heapq
 import six
 
 
@@ -20,6 +22,19 @@ class ArrivalGeneratorBase(util.Iterable):
         self.end = (self.start.replace(hours=3) if end is None
                     else arrow.get(end)).to(provider._timezone)
 
+    @abstractproperty
+    def realtime(self):
+        """
+        True if this generator's Arrival objects represent realtime data,
+        otherwise False.
+
+        You don't have to define a property function -- just set the class
+        property during the definition, like this:
+
+        class MyArrivalGenerator(ArrivalGeneratorBase):
+            realtime = False
+        """
+
     @abstractmethod
     def __next__(self):
         """Provide the next arrival."""
@@ -27,13 +42,18 @@ class ArrivalGeneratorBase(util.Iterable):
 
 class ArrivalQueryable(Queryable):
 
-    def __init__(self, provider, arrival_gen, query_funcs=None, **kwargs):
+    def __init__(self, provider, arrival_gens, query_funcs=None, **kwargs):
         self.provider = provider
-        self.arrival_gen = arrival_gen
 
-        if 'realtime' in kwargs and hasattr(arrival_gen, 'realtime'):
-            if kwargs['realtime'] != arrival_gen.realtime:
-                super(ArrivalQueryable, self).__init__(iter(()), query_funcs)
+        if isinstance(arrival_gens, collections.Iterable):
+            self.arrival_gens = tuple(arrival_gens)
+        else:
+            self.arrival_gens = (arrival_gens,)
+
+        if 'realtime' in kwargs:
+            realtime = bool(kwargs['realtime'])
+        else:
+            realtime = any(gen.realtime for gen in self.arrival_gens)
 
         if 'stop' in kwargs:
             stops = [kwargs.pop('stop')]
@@ -57,12 +77,14 @@ class ArrivalQueryable(Queryable):
                     kwargs[attr] = arrow.Arrow.fromdatetime(kwargs[attr])
                 elif isinstance(kwargs[attr], datetime.date):
                     kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
-        start_time = kwargs.pop('start_time', None)
-        end_time = kwargs.pop('end_time', None)
+        start = kwargs.pop('start_time', None)
+        end = kwargs.pop('end_time', None)
 
-        it = arrival_gen(provider, stops, routes, start_time, end_time)
-        super(ArrivalQueryable, self).__init__(it, query_funcs)
+        it = heapq.merge(*[gen(provider, stops, routes, start, end)
+                           for gen in self.arrival_gens
+                           if gen.realtime == realtime])
+        super(ArrivalQueryable, self).__init__(it, query_funcs, **kwargs)
 
     def _new(self, query_funcs, kwargs):
-        return ArrivalQueryable(self.provider, self.arrival_gen,
+        return ArrivalQueryable(self.provider, self.arrival_gens,
                                 query_funcs, **kwargs)
