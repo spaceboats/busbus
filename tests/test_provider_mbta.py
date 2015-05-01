@@ -18,7 +18,7 @@ def mbta_provider(engine):
 
 # test that we are indeed using our local abridged copy of the GTFS feed
 def test_len_routes(mbta_provider):
-    assert len(list(mbta_provider.routes)) == 1
+    assert len(list(mbta_provider.routes)) == 5
 
 
 def test_agency_phoneword_e164(mbta_provider):

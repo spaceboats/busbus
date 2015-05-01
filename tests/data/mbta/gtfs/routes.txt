@@ -1,2 +1,6 @@
 "route_id","agency_id","route_short_name","route_long_name","route_desc","route_type","route_url","route_color","route_text_color","route_sort_order"
 "Green-B","1","B","Green Line B","Rapid Transit",0,,"427B1D","FFFFFF",2
+"Green-D","1","D","Green Line D","Rapid Transit",0,,"427B1D","FFFFFF",4
+"Orange","1",,"Orange Line","Rapid Transit",1,,"E87200","FFFFFF",6
+"39","1","39",,"Key Bus Route (Frequent Service)",3,,"FFFF7C","000000",3900
+"Logan-22","2","Shuttle","Massport Subway Shuttle (22)","Airport Shuttle",3,,,,2000022
