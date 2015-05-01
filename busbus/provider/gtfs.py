@@ -214,6 +214,12 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
     def __init__(self, provider, stops, routes, start, end):
         super(GTFSArrivalGenerator, self).__init__(provider, stops, routes,
                                                    start, end)
+
+        if self.stops is None:
+            self.stops = self.provider.stops
+        if self.routes is None:
+            self.routes = self.provider.routes
+
         self.service_cache = {}
         self.freq_cache = {}
         self.it = None

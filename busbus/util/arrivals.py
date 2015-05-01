@@ -61,7 +61,7 @@ class ArrivalQueryable(Queryable):
             stop = provider.get(busbus.Stop, kwargs.pop('stop.id'), None)
             stops = [] if stop is None else [stop]
         else:
-            stops = provider.stops
+            stops = None
 
         if 'route' in kwargs:
             routes = [kwargs.pop('route')]
@@ -69,7 +69,7 @@ class ArrivalQueryable(Queryable):
             route = provider.get(busbus.Route, kwargs.pop('route.id'), None)
             routes = [] if route is None else [route]
         else:
-            routes = provider.routes
+            routes = None
 
         for attr in ('start_time', 'end_time'):
             if attr in kwargs:
