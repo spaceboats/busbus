@@ -209,6 +209,7 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
 
 
 class GTFSArrivalGenerator(ArrivalGeneratorBase):
+    realtime = False
 
     def __init__(self, provider, stops, routes, start, end):
         super(GTFSArrivalGenerator, self).__init__(provider, stops, routes,
@@ -251,7 +252,7 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
                                   time=time, departure_time=dep,
                                   headsign=stop_time['trip_headsign'],
                                   short_name=stop_time['trip_short_name'],
-                                  bikes_ok=bikes_ok)
+                                  bikes_ok=bikes_ok, realtime=False)
 
         days = filter(self._valid_date_filter(stop_time['service_id']),
                       arrow.Arrow.range('day', self.start.floor('day'),

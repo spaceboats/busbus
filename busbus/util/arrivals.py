@@ -31,6 +31,10 @@ class ArrivalQueryable(Queryable):
         self.provider = provider
         self.arrival_gen = arrival_gen
 
+        if 'realtime' in kwargs and hasattr(arrival_gen, 'realtime'):
+            if kwargs['realtime'] != arrival_gen.realtime:
+                super(ArrivalQueryable, self).__init__(iter(()), query_funcs)
+
         if 'stop' in kwargs:
             stops = [kwargs.pop('stop')]
         elif 'stop.id' in kwargs:

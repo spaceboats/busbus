@@ -72,7 +72,7 @@ class Route(BaseEntity):
 
 class Arrival(BaseEntity):
     __attrs__ = ('route', 'stop', 'time', 'departure_time', 'headsign',
-                 'short_name', 'bikes_ok')
+                 'short_name', 'bikes_ok', 'realtime')
     __repr_attrs__ = ('route', 'stop', 'time')
 
     def __lt__(self, other):

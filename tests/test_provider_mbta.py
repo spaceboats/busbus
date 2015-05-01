@@ -34,10 +34,10 @@ def test_bu_central_children(mbta_provider):
         assert child.parent.id == u'place-bucen'
 
 
-def test_green_to_bu(mbta_provider):
+def test_green_to_bu_gtfs(mbta_provider):
     stop = mbta_provider.get(busbus.Stop, u'70144')
     route = mbta_provider.get(busbus.Route, u'Green-B')
     assert len(list(mbta_provider.arrivals.where(
-        stop=stop, route=route,
+        stop=stop, route=route, realtime=False,
         start_time=arrow.get('2015-03-10T14:00:00-04:00'),
         end_time=arrow.get('2015-03-10T16:00:00-04:00')))) == 17
