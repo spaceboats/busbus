@@ -26,8 +26,11 @@ class ArrivalGeneratorBase(util.Iterable):
     @abstractproperty
     def realtime(self):
         """
-        True if this generator's Arrival objects represent realtime data,
+        True if this generator's Arrival objects can represent realtime data,
         otherwise False.
+
+        Setting this to True doesn't necessarily mean that all the generated
+        arrivals will be realtime.
 
         You don't have to define a property function -- just set the class
         property during the definition, like this:

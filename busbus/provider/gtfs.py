@@ -224,7 +224,7 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
         self.freq_cache = {}
         self.it = None
 
-    def _build_iterable(self):
+    def _stop_times(self, stop, route):
         st_query = """select distinct min_arrival_time, service_id,
             trip_headsign, trip_short_name, bikes_allowed,
             coalesce(st.arrival_time, st._arrival_interpolate) as arr,
@@ -233,12 +233,15 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
             t.trip_id=st.trip_id and t._feed=st._feed
         where route_id=:route_id and stop_id=:stop_id and
             t._feed=:_feed order by arrival_time asc"""
-        iters = []
         cur = self.provider.conn.cursor()
+        return cur.execute(st_query, {
+            'route_id': route.id, 'stop_id': stop.id,
+            '_feed': self.provider.feed_id})
+
+    def _build_iterable(self):
+        iters = []
         for stop, route in itertools.product(self.stops, self.routes):
-            for stop_time in cur.execute(st_query, {
-                    'route_id': route.id, 'stop_id': stop.id,
-                    '_feed': self.provider.feed_id}):
+            for stop_time in self._stop_times(stop, route):
                 iters.append(self._build_arrivals(stop, route, stop_time))
         return heapq.merge(*iters)
 
