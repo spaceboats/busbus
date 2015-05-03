@@ -137,7 +137,6 @@ def test_stops_no_children(provider):
 def test_stops_no_children_base(provider):
     stop = next(provider.stops)
     stop = busbus.Stop(**dict(stop))
-    print(type(stop))
     assert len(list(stop.children)) == 0
 
 
