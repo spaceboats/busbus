@@ -1,6 +1,6 @@
 from busbus.entity import BaseEntity
 from busbus.queryable import Queryable
-from busbus.util import Config
+from busbus.util import Config, dist
 
 import errno
 import os
@@ -79,6 +79,20 @@ class Stop(BaseEntity):
             yielded_ids.append(stop.id)
             yield stop
             stops.extend(stop.children)
+
+    def distance_to(self, *args):
+        """
+        Returns the distance to another stop (one Stop argument) or a latitude
+        and longitude (two arguments, or one two-element argument) in meters.
+        """
+        if len(args) == 1:
+            if isinstance(args[0], Stop):
+                return dist(self.latitude, self.longitude,
+                            args[0].latitude, args[0].longitude)
+            else:
+                return dist(self.latitude, self.longitude, *args[0])
+        else:
+            return dist(self.latitude, self.longitude, *args)
 
 
 class Route(BaseEntity):

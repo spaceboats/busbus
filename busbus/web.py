@@ -1,7 +1,6 @@
 import busbus
 from busbus.entity import BaseEntityJSONEncoder
 from busbus.provider import ProviderBase
-from busbus.util import dist
 
 import cherrypy
 import collections
@@ -141,10 +140,9 @@ class Engine(busbus.Engine):
         if all(x in kwargs for x in expected):
             for x in expected:
                 kwargs[x] = float(kwargs[x])
+            latlon = (kwargs['latitude'], kwargs['longitude'])
             return super(Engine, self).stops.where(
-                lambda s: (dist(kwargs['latitude'], kwargs['longitude'],
-                                s.latitude, s.longitude) <=
-                           kwargs['distance']))
+                lambda s: s.distance_to(latlon) <= kwargs['distance'])
         else:
             raise APIError('missing attributes: ' + ','.join(
                 x for x in expected if x not in kwargs), 422)
