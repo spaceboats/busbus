@@ -4,6 +4,7 @@ import busbus
 import busbus.entity
 from busbus.queryable import Queryable
 from busbus import util
+from busbus.util.arrivals import ArrivalQueryable, ArrivalGeneratorBase
 from busbus.util.csv import CSVReader
 
 import apsw
@@ -151,7 +152,8 @@ class GTFSStop(SQLEntityMixin, busbus.Stop):
     @property
     def children(self):
         result = self._query(parent_station=self.id)
-        return Queryable(GTFSStop(**dict(row)) for row in result)
+        return Queryable(GTFSStop(self.provider, **dict(row))
+                         for row in result)
 
 
 class GTFSRoute(SQLEntityMixin, busbus.Route):
@@ -206,43 +208,43 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
                 yield direction
 
 
-class ArrivalIterator(util.Iterable):
-    """
-    Private class to build arrivals, in order of arrival time, given a list of
-    stops and routes.
-    """
+class GTFSArrivalGenerator(ArrivalGeneratorBase):
+    realtime = False
 
     def __init__(self, provider, stops, routes, start, end):
-        self.provider = provider
-        self.stops = stops
-        self.routes = routes
-        self.start = (arrow.now() if start is None
-                      else arrow.get(start)).to(provider._timezone)
-        self.end = (self.start.replace(hours=3) if end is None
-                    else arrow.get(end)).to(provider._timezone)
+        super(GTFSArrivalGenerator, self).__init__(provider, stops, routes,
+                                                   start, end)
+
+        if self.stops is None:
+            self.stops = self.provider.stops
+        if self.routes is None:
+            self.routes = self.provider.routes
+
         self.service_cache = {}
         self.freq_cache = {}
         self.it = None
 
-    def __next__(self):
-        if self.it is None:
-            st_query = """select distinct min_arrival_time, service_id,
-                trip_headsign, trip_short_name, bikes_allowed,
-                coalesce(st.arrival_time, st._arrival_interpolate) as arr,
-                departure_time, st.trip_id as trip_id
-            from trips_v as t join stop_times as st on
-                t.trip_id=st.trip_id and t._feed=st._feed
-            where route_id=:route_id and stop_id=:stop_id and
-                t._feed=:_feed order by arrival_time asc"""
-            iters = []
-            cur = self.provider.conn.cursor()
-            for stop, route in itertools.product(self.stops, self.routes):
-                for stop_time in cur.execute(st_query, {
-                        'route_id': route.id, 'stop_id': stop.id,
-                        '_feed': self.provider.feed_id}):
-                    iters.append(self._build_arrivals(stop, route, stop_time))
-            self.it = heapq.merge(*iters)
-        return next(self.it)
+    def _stop_times(self, stop, route):
+        st_query = """select distinct min_arrival_time, service_id,
+            trip_headsign, trip_short_name, bikes_allowed,
+            coalesce(st.arrival_time, st._arrival_interpolate) as arr,
+            departure_time, st.trip_id as trip_id
+        from trips_v as t join stop_times as st on
+            t.trip_id=st.trip_id and t._feed=st._feed
+        where route_id=:route_id and stop_id=:stop_id and
+            t._feed=:_feed order by arrival_time asc"""
+        cur = self.provider.conn.cursor()
+        return cur.execute(st_query, {
+            'route_id': route.id, 'stop_id': stop.id,
+            '_feed': self.provider.feed_id})
+
+    def _build_iterable(self):
+        iters = []
+        stops = busbus.Stop.add_children(self.stops)
+        for stop, route in itertools.product(stops, self.routes):
+            for stop_time in self._stop_times(stop, route):
+                iters.append(self._build_arrivals(stop, route, stop_time))
+        return heapq.merge(*iters)
 
     def _build_arrivals(self, stop, route, stop_time):
         def build_arr(day, offset=None):
@@ -258,7 +260,7 @@ class ArrivalIterator(util.Iterable):
                                   time=time, departure_time=dep,
                                   headsign=stop_time['trip_headsign'],
                                   short_name=stop_time['trip_short_name'],
-                                  bikes_ok=bikes_ok)
+                                  bikes_ok=bikes_ok, realtime=False)
 
         days = filter(self._valid_date_filter(stop_time['service_id']),
                       arrow.Arrow.range('day', self.start.floor('day'),
@@ -319,51 +321,6 @@ class ArrivalIterator(util.Iterable):
             self.service_cache[id]['exceptions'] = {r['date']: r['e']
                                                     for r in cd_result}
         return self.service_cache[id]
-
-
-class GTFSArrivalQueryable(Queryable):
-    """
-    Private class to build the GTFSMixin.arrivals Queryable.
-    """
-
-    def __init__(self, provider, query_funcs=None, **kwargs):
-        self.provider = provider
-
-        if 'stop' in kwargs:
-            stops = [kwargs.pop('stop')]
-        elif 'stop.id' in kwargs:
-            stop = provider.get(busbus.Stop, kwargs.pop('stop.id'), None)
-            stops = [] if stop is None else [stop]
-        else:
-            stops = provider.stops
-
-        if 'route' in kwargs:
-            routes = [kwargs.pop('route')]
-        elif 'route.id' in kwargs:
-            route = provider.get(busbus.Route, kwargs.pop('route.id'), None)
-            routes = [] if route is None else [route]
-        else:
-            routes = provider.routes
-
-        for attr in ('start_time', 'end_time'):
-            if attr in kwargs:
-                if isinstance(kwargs[attr], datetime.datetime):
-                    kwargs[attr] = arrow.Arrow.fromdatetime(kwargs[attr])
-                elif isinstance(kwargs[attr], datetime.date):
-                    kwargs[attr] = arrow.Arrow.fromdate(kwargs[attr])
-        start_time = kwargs.pop('start_time', None)
-        end_time = kwargs.pop('end_time', None)
-
-        it = ArrivalIterator(provider, stops, routes, start_time, end_time)
-        super(GTFSArrivalQueryable, self).__init__(it, query_funcs)
-        self.kwargs = kwargs
-
-    def where(self, query_func=None, **kwargs):
-        new_funcs = (self.query_funcs + (query_func,) if query_func else
-                     self.query_funcs)
-        new_kwargs = self.kwargs.copy()
-        new_kwargs.update(kwargs)
-        return GTFSArrivalQueryable(self.provider, new_funcs, **new_kwargs)
 
 
 def gtfs_row_tracer(cur, row):
@@ -553,4 +510,4 @@ class GTFSMixin(object):
 
     @property
     def arrivals(self):
-        return GTFSArrivalQueryable(self)
+        return ArrivalQueryable(self, GTFSArrivalGenerator)

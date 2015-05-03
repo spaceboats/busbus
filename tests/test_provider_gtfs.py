@@ -106,6 +106,7 @@ entity_len_params = [
     ('routes', 5),
     # keep in mind this is from 2007-06-03T06:45:00-07:00 to 09:45:00
     ('arrivals', 139),
+    ('alerts', 0),
 ]
 
 
@@ -136,7 +137,6 @@ def test_stops_no_children(provider):
 def test_stops_no_children_base(provider):
     stop = next(provider.stops)
     stop = busbus.Stop(**dict(stop))
-    print(type(stop))
     assert len(list(stop.children)) == 0
 
 
@@ -207,3 +207,8 @@ def test_arrivals_end_before_start(provider):
     assert (len(list(provider.arrivals.where(
         start_time=arrow.now(),
         end_time=arrow.now().replace(hours=-3)))) == 0)
+
+
+def test_no_realtime(provider):
+    with pytest.raises(StopIteration):
+        next(provider.arrivals.where(realtime=True))

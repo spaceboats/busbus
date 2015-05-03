@@ -46,6 +46,10 @@ class Engine(object):
     def arrivals(self):
         return Queryable.chain(*[p.arrivals for p in self._providers.values()])
 
+    @property
+    def alerts(self):
+        return Queryable.chain(*[p.alerts for p in self._providers.values()])
+
 
 class Agency(BaseEntity):
     __attrs__ = ('id', 'name', 'url', 'timezone', 'lang', 'phone_e164',
@@ -60,6 +64,22 @@ class Stop(BaseEntity):
     def children(self):
         return self.provider.stops.where(lambda s: s.parent == self)
 
+    @staticmethod
+    def add_children(it):
+        """
+        Given an iterable of stops, yields the stops including all their
+        children.
+        """
+        yielded_ids = []
+        stops = list(it)
+        while stops:
+            stop = stops.pop(0)
+            if stop.id in yielded_ids:
+                continue
+            yielded_ids.append(stop.id)
+            yield stop
+            stops.extend(stop.children)
+
 
 class Route(BaseEntity):
     __attrs__ = ('id', 'agency', 'short_name', 'name', 'description', 'type',
@@ -68,11 +88,15 @@ class Route(BaseEntity):
 
 class Arrival(BaseEntity):
     __attrs__ = ('route', 'stop', 'time', 'departure_time', 'headsign',
-                 'short_name', 'bikes_ok')
+                 'short_name', 'bikes_ok', 'realtime')
     __repr_attrs__ = ('route', 'stop', 'time')
 
     def __lt__(self, other):
         return self.time < other.time
 
 
-ENTITIES = (Agency, Stop, Route, Arrival)
+class Alert(BaseEntity):
+    __attrs__ = ('id', 'text')
+
+
+ENTITIES = (Agency, Stop, Route, Arrival, Alert)
