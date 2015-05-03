@@ -30,4 +30,4 @@ class CSVReader(util.Iterable):
             func = lambda x: x.decode('utf-8') if x else None
         else:
             func = lambda x: x if x else None
-        return [func(x) for x in row]
+        return [func(x.strip()) for x in row]
