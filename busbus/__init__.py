@@ -64,6 +64,22 @@ class Stop(BaseEntity):
     def children(self):
         return self.provider.stops.where(lambda s: s.parent == self)
 
+    @staticmethod
+    def add_children(it):
+        """
+        Given an iterable of stops, yields the stops including all their
+        children.
+        """
+        yielded_ids = []
+        stops = list(it)
+        while stops:
+            stop = stops.pop(0)
+            if stop.id in yielded_ids:
+                continue
+            yielded_ids.append(stop.id)
+            yield stop
+            stops.extend(stop.children)
+
 
 class Route(BaseEntity):
     __attrs__ = ('id', 'agency', 'short_name', 'name', 'description', 'type',

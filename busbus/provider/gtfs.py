@@ -240,7 +240,8 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
 
     def _build_iterable(self):
         iters = []
-        for stop, route in itertools.product(self.stops, self.routes):
+        stops = busbus.Stop.add_children(self.stops)
+        for stop, route in itertools.product(stops, self.routes):
             for stop_time in self._stop_times(stop, route):
                 iters.append(self._build_arrivals(stop, route, stop_time))
         return heapq.merge(*iters)
