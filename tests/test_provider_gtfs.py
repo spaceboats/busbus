@@ -156,6 +156,23 @@ def test_stops_latlon(provider):
         assert isinstance(stop.longitude, float)
 
 
+def test_stop_distance_to_same(provider):
+    stop = provider.get(busbus.Stop, u'AMV')
+    assert stop.distance_to(stop) < 0.000005
+
+
+def test_stop_distance_to_other(provider):
+    stop1 = provider.get(busbus.Stop, u'AMV')
+    stop2 = provider.get(busbus.Stop, u'STAGECOACH')
+    assert 43.6 < stop1.distance_to(stop2) / 1000 < 43.7
+
+
+def test_stop_distance_to_latlon(provider):
+    stop = provider.get(busbus.Stop, u'AMV')
+    assert 43.6 < stop.distance_to((36.915682, -116.751677)) / 1000 < 43.7
+    assert 43.6 < stop.distance_to(36.915682, -116.751677) / 1000 < 43.7
+
+
 def test_routes_agency(provider):
     for route in provider.routes:
         assert route.agency.id == 'DTA'
