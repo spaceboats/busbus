@@ -509,7 +509,7 @@ class GTFSMixin(object):
                 (select trip_id, stop_id from stop_times where _feed=:_feed)
                 as st join
                 (select trip_id, route_id, _feed from trips where _feed=:_feed)
-                as t on st.trip_id=t.trip_id''')
+                as t on st.trip_id=t.trip_id''', {'_feed': self.feed_id})
             cur.execute('commit transaction')
 
     def _query(self, cls, **kwargs):
