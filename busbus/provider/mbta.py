@@ -25,6 +25,9 @@ class MBTAArrivalGenerator(ArrivalGeneratorBase):
                 cur = self.provider.conn.cursor()
                 resp = self.provider._mbta_realtime_call('predictionsbystop',
                                                          {'stop': stop.id})
+                if resp.status_code == 404:
+                    return ()
+
                 trips = {}
                 for mode in resp.json()['mode']:
                     for route in mode['route']:
@@ -56,6 +59,8 @@ class MBTAArrivalGenerator(ArrivalGeneratorBase):
             def yield_predictions_by_route(route):
                 resp = self.provider._mbta_realtime_call('predictionsbyroute',
                                                          {'route': route.id})
+                if resp.status_code == 404:
+                    return ()
 
                 if self.stops is None:
                     stops = route.stops
