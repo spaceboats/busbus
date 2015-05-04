@@ -1,0 +1,29 @@
+route_id,route_short_name,route_long_name,route_type
+18,37,Mill Plain - Fisher's,3
+39,80,VanMall / Fisher's,3
+40,92,Camas / Washougal,3
+45,25,St. Johns - Fruit Valley,3
+46,32,Evergreen / Andresen - Hazel Dell Ave,3
+47,39,VA / 87th Ave,3
+49,72,Orchards,3
+54,65,Parkrose Limited,3
+56,177,Evergreen Express,3
+57,4,Fourth Plain,3
+59,30,Burton,3
+61,190,Marquam Hill Express,3
+63,41,SR 14 Limited,3
+64,47,Battle Ground Limited,3
+67,164,Fisher's Landing Express,3
+72,157,Lloyd District Express,3
+75,9,Felida,3
+80,134,Salmon Creek Express,3
+81,105,I-5 Express,3
+82,3,City Center - A/B,3
+83,44,Fourth Plain Limited,3
+84,7,Battle Ground,3
+85,199,99th Street Express,3
+86,2,Lincoln,3
+88,78,78th Street,3
+89,19,Salmon Creek,3
+95,38,Mill Plain - 192nd,3
+96,71,Highway 99,3
