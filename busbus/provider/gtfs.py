@@ -150,6 +150,15 @@ class GTFSStop(SQLEntityMixin, busbus.Stop):
         super(GTFSStop, self).__init__(provider, **data)
 
     @property
+    def routes(self):
+        result = self.provider.conn.cursor().execute(
+            '''select route_id from _stops_routes where
+            stop_id=? and _feed=?''',
+            (self.id, self.provider.feed_id))
+        return Queryable(self.provider.get(busbus.Route, row['route_id'])
+                         for row in result)
+
+    @property
     def children(self):
         result = self._query(parent_station=self.id)
         return Queryable(GTFSStop(self.provider, **dict(row))
@@ -178,6 +187,15 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
             pass  # FIXME
 
         super(GTFSRoute, self).__init__(provider, **data)
+
+    @property
+    def stops(self):
+        result = self.provider.conn.cursor().execute(
+            '''select stop_id from _stops_routes where
+            route_id=? and _feed=?''',
+            (self.id, self.provider.feed_id))
+        return Queryable(self.provider.get(busbus.Stop, row['stop_id'])
+                         for row in result)
 
     @property
     def directions(self):
@@ -216,9 +234,22 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
                                                    start, end)
 
         if self.stops is None:
-            self.stops = self.provider.stops
-        if self.routes is None:
-            self.routes = self.provider.routes
+            if self.routes is None:
+                self.stops = self.provider.stops
+                self.routes = self.provider.routes
+            else:
+                stops_dict = {}
+                for route in self.routes:
+                    for stop in route.stops:
+                        stops_dict[stop.id] = stop
+                self.stops = stops_dict.values()
+        else:
+            if self.routes is None:
+                routes_dict = {}
+                for stop in self.stops:
+                    for route in stop.routes:
+                        routes_dict[route.id] = route
+                self.routes = routes_dict.values()
 
         self.service_cache = {}
         self.freq_cache = {}
@@ -471,6 +502,14 @@ class GTFSMixin(object):
                 innercur.execute('''update trips set _min_arrival_time=?
                                  where trip_id=? and _feed=?''',
                                  (min_time, trip_id, self.feed_id))
+
+            cur.execute(
+                '''insert into _stops_routes (stop_id, route_id, _feed)
+                select distinct st.stop_id, t.route_id, t._feed from
+                (select trip_id, stop_id from stop_times where _feed=:_feed)
+                as st join
+                (select trip_id, route_id, _feed from trips where _feed=:_feed)
+                as t on st.trip_id=t.trip_id''')
             cur.execute('commit transaction')
 
     def _query(self, cls, **kwargs):

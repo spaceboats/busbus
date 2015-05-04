@@ -45,21 +45,20 @@ class MBTAArrivalGenerator(ArrivalGeneratorBase):
                                         'stop_id': stop.id,
                                     }
 
-                routes = self.provider.routes
+                routes = stop.routes
 
                 return heapq.merge(*[self._merge_arrivals(stop, route, trips)
-                                     for stop, route in itertools.product(
-                                         busbus.Stop.add_children((stop,)),
-                                         routes)])
+                                     for route in routes])
 
-            its = list(six.moves.map(yield_predictions_by_stop, self.stops))
+            its = list(six.moves.map(yield_predictions_by_stop,
+                                     busbus.Stop.add_children(self.stops)))
         else:
             def yield_predictions_by_route(route):
                 resp = self.provider._mbta_realtime_call('predictionsbyroute',
                                                          {'route': route.id})
 
                 if self.stops is None:
-                    stops = self.provider.stops
+                    stops = route.stops
                 else:
                     stops = self.stops
                 stops = list(stops)

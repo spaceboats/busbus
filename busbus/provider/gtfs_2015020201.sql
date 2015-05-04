@@ -58,6 +58,12 @@ create table routes (
     foreign key (_feed, agency_id) references agencies (_feed, agency_id)
 );
 
+create table _stops_routes (
+    _feed integer not null,
+    stop_id text not null,
+    route_id text not null
+);
+
 create table trips (
     _feed integer not null,
     route_id text not null,
@@ -188,6 +194,8 @@ create table feed_info (
 create index idx_agency_id_feed on agency (agency_id, _feed);
 create index idx_stops_id_feed on stops (stop_id, _feed);
 create index idx_routes_id_feed on routes (route_id, _feed);
+create index idx_stops_routes_stops on _stops_routes (stop_id, _feed);
+create index idx_stops_routes_routes on _stops_routes (route_id, _feed);
 create index idx_trips_id_feed on trips(trip_id, _feed);
 create index idx_trips_route_feed on trips (route_id, _feed);
 create index idx_trips_min_arrival_time on trips (_min_arrival_time);
