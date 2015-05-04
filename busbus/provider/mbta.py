@@ -31,16 +31,17 @@ class MBTAArrivalGenerator(ArrivalGeneratorBase):
                         for direction in route['direction']:
                             for trip in direction['trip']:
                                 query = cur.execute(
-                                    '''select route_id from trips where
-                                    trip_id=? and _feed=?''',
-                                    (trip['trip_id'], self.provider.feed_id))
+                                    '''select null from stop_times where
+                                    stop_id=? and trip_id=? and _feed=?''',
+                                    (stop.id, trip['trip_id'],
+                                     self.provider.feed_id))
                                 # if the query returns anything it's guaranteed
                                 # to be 1 row
                                 for row in query:
                                     trips[trip['trip_id']] = {
                                         'pre_dt': trip['pre_dt'],
                                         'trip_headsign': trip['trip_headsign'],
-                                        'route_id': row['route_id'],
+                                        'route_id': route['route_id'],
                                         'stop_id': stop.id,
                                     }
 
