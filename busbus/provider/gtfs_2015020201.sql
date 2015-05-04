@@ -70,6 +70,7 @@ create table trips (
     shape_id text,
     wheelchair_accessible integer,
     bikes_allowed integer,
+    _min_arrival_time gtfstime,
     primary key (_feed, trip_id),
     foreign key (_feed, route_id) references routes (_feed, route_id),
     foreign key (_feed, service_id) references calendar (_feed, service_id)
@@ -182,10 +183,18 @@ create table feed_info (
 );
 */
 
--- VIEWS ----------------------------------------------------------------------
+-- INDICES --------------------------------------------------------------------
 
-create view trips_v as
-    select t.*, st.min_arrival_time from trips as t join
-        (select _feed, trip_id, min(coalesce(arrival_time, _arrival_interpolate)) as min_arrival_time
-            from stop_times group by trip_id) as st
-        on t.trip_id=st.trip_id and t._feed=st._feed;
+create index idx_agency_id_feed on agency (agency_id, _feed);
+create index idx_stops_id_feed on stops (stop_id, _feed);
+create index idx_routes_id_feed on routes (route_id, _feed);
+create index idx_trips_id_feed on trips(trip_id, _feed);
+create index idx_trips_route_feed on trips (route_id, _feed);
+create index idx_trips_min_arrival_time on trips (_min_arrival_time);
+create index idx_stop_times_stop_feed on stop_times (stop_id, _feed);
+create index idx_stop_times_trip_feed on stop_times (trip_id, _feed);
+create index idx_stop_times_arrival on stop_times (arrival_time, _arrival_interpolate);
+create index idx_frequencies_trip on frequencies (trip_id, _feed);
+create index idx_frequencies_start_time on frequencies (start_time);
+create index idx_calendar_service on calendar (service_id, _feed);
+create index idx_calendar_dates_service on calendar_dates (service_id, _feed);
