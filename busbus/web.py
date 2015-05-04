@@ -101,6 +101,18 @@ class Engine(busbus.Engine):
                     raise APIError('_limit must be a positive integer', 422)
                 response['request']['limit'] = limit
 
+            if 'realtime' in kwargs:
+                if kwargs['realtime'] in ('y', 'Y', 'yes', 'Yes', 'YES',
+                                          'true', 'True', 'TRUE',
+                                          'on', 'On', 'ON'):
+                    kwargs['realtime'] = True
+                elif kwargs['realtime'] in ('n', 'N', 'no', 'No', 'NO',
+                                            'false', 'False', 'FALSE',
+                                            'off', 'Off', 'OFF'):
+                    kwargs['realtime'] = False
+                else:
+                    raise APIError('realtime is not a boolean', 422)
+
             if action:
                 response['request']['action'] = action
                 if (entity, action) in self._entity_actions:

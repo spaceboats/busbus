@@ -135,3 +135,25 @@ def test_routes_directions(url_prefix, provider_id):
 def test_routes_directions_missing_attrs(url_prefix):
     data, resp = get(url_prefix + 'routes/directions', 422)
     assert data['error'].startswith('missing attributes')
+
+
+def test_arrivals_realtime_true(url_prefix, provider_id):
+    data, resp = get(url_prefix + ('arrivals?stop.id=AMV&realtime=TRUE&'
+                                   'start_time=2007-06-03T06:45:00-07:00&'
+                                   'provider.id={0}'.format(provider_id)))
+    assert data['request']['params']['realtime'] == True
+    assert len(data['arrivals']) == 0
+
+
+def test_arrivals_realtime_false(url_prefix, provider_id):
+    data, resp = get(url_prefix + ('arrivals?stop.id=AMV&realtime=no&'
+                                   'start_time=2007-06-03T06:45:00-07:00&'
+                                   'provider.id={0}'.format(provider_id)))
+    assert data['request']['params']['realtime'] == False
+    assert len(data['arrivals']) == 1
+
+
+def test_arrivals_realtime_invalid(url_prefix, provider_id):
+    data, resp = get(url_prefix + ('arrivals?stop.id=AMV&realtime=butts&'
+                                   'start_time=2007-06-03T06:45:00-07:00&'
+                                   'provider.id={0}'.format(provider_id)), 422)
