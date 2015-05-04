@@ -93,11 +93,12 @@ class MBTAArrivalGenerator(ArrivalGeneratorBase):
         for trip_id, trip in trips.items():
             if stop.id == trip['stop_id'] and route.id == trip['route_id']:
                 time = arrow.get(trip['pre_dt']).to(self.provider._timezone)
-                arr = busbus.Arrival(self.provider, realtime=True,
-                                     stop=stop, route=route,
-                                     time=time, departure_time=time,
-                                     headsign=trip['trip_headsign'])
-                yield (trip_id, arr)
+                if self.start <= time <= self.end:
+                    arr = busbus.Arrival(self.provider, realtime=True,
+                                         stop=stop, route=route,
+                                         time=time, departure_time=time,
+                                         headsign=trip['trip_headsign'])
+                    yield (trip_id, arr)
 
     def _build_scheduled_arrivals(self, stop, route):
         for stop_time in self.gtfs_gen._stop_times(stop, route):
