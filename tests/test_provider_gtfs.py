@@ -60,10 +60,6 @@ def test_already_imported(provider, gtfs_zip_data):
     assert len(list(provider.agencies)) == 1
 
 
-def test_engine_has_one_provider(engine, provider):
-    assert len(engine._providers) == 1
-
-
 @pytest.mark.parametrize('entity', (None, busbus.Stop, busbus.Arrival))
 def test_provider_get_default(provider, entity):
     assert provider.get(entity, u'The weather in london',
@@ -111,8 +107,9 @@ entity_len_params = [
 
 
 @pytest.mark.parametrize('attr,count', entity_len_params)
-def test_entity_len_engine(engine, attr, count):
-    assert len(list(getattr(engine, attr))) == count
+def test_entity_len_engine(engine, provider, attr, count):
+    with mock.patch.object(engine, '_providers', {'hi': provider}) as m:
+        assert len(list(getattr(engine, attr))) == count
 
 
 @pytest.mark.parametrize('attr,count', entity_len_params)
