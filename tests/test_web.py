@@ -1,5 +1,7 @@
 # coding=utf-8
 
+from busbus.provider import ProviderBase
+from busbus.queryable import Queryable
 import busbus.web
 from .conftest import SampleGTFSProvider, mock_gtfs_zip
 
@@ -10,15 +12,43 @@ import requests
 from wsgi_intercept import requests_intercept, add_wsgi_intercept
 
 
+class DumbUselessProvider(ProviderBase):
+
+    def get(self, entity, id, default=None):
+        return default
+
+    @property
+    def agencies(self):
+        return Queryable(())
+
+    @property
+    def stops(self):
+        return Queryable(())
+
+    @property
+    def routes(self):
+        return Queryable(())
+
+    @property
+    def arrivals(self):
+        return Queryable(())
+
+
 @pytest.fixture(scope='module')
-@responses.activate
-def url_prefix(request, engine_config):
+def web_engine(engine_config):
     engine = busbus.web.Engine(engine_config)
     responses.add(responses.GET, SampleGTFSProvider.gtfs_url,
                   body=mock_gtfs_zip('_sample'), status=200,
                   content_type='application/zip')
     SampleGTFSProvider(engine)
+    DumbUselessProvider(engine)
 
+    return engine
+
+
+@pytest.fixture(scope='module')
+@responses.activate
+def url_prefix(request, web_engine):
     # https://cherrypy.readthedocs.org/en/latest/deploy.html
     # § Embedding into another WSGI framework
     cherrypy.config.update({'environment': 'embedded',
@@ -30,7 +60,7 @@ def url_prefix(request, engine_config):
     host = 'busbus.invalid'
     port = 8080
     requests_intercept.install()
-    add_wsgi_intercept(host, port, lambda: cherrypy.tree.mount(engine))
+    add_wsgi_intercept(host, port, lambda: cherrypy.tree.mount(web_engine))
 
     @request.addfinalizer
     def fin():
@@ -41,9 +71,17 @@ def url_prefix(request, engine_config):
 
 
 @pytest.fixture(scope='module')
-def provider_id(url_prefix):
-    data, resp = get(url_prefix + 'providers')
-    return data['providers'][0]['id']
+def provider_id(web_engine):
+    for id, provider in web_engine._providers.items():
+        if isinstance(provider, SampleGTFSProvider):
+            return id
+
+
+@pytest.fixture(scope='module')
+def dumb_provider_id(web_engine):
+    for id, provider in web_engine._providers.items():
+        if isinstance(provider, DumbUselessProvider):
+            return id
 
 
 def get(url, code=200):
@@ -73,9 +111,10 @@ def test_invalid_action(url_prefix):
     get(url_prefix + 'providers/invalid_action', 404)
 
 
-def test_nested(url_prefix, provider_id):
-    data, resp = get(url_prefix + 'routes?provider.id={0}'.format(provider_id))
-    assert data['routes']
+def test_nested(web_engine, url_prefix):
+    data, resp = get(url_prefix + ('arrivals?stop.name=Bullfrog (Demo)&'
+                                   'start_time=2007-06-03T06:45:00-07:00'))
+    assert all(a['stop']['id'] == 'BULLFROG' for a in data['arrivals'])
 
 
 def test_query(url_prefix):
@@ -157,3 +196,14 @@ def test_arrivals_realtime_invalid(url_prefix, provider_id):
     data, resp = get(url_prefix + ('arrivals?stop.id=AMV&realtime=butts&'
                                    'start_time=2007-06-03T06:45:00-07:00&'
                                    'provider.id={0}'.format(provider_id)), 422)
+
+
+def test_arrivals_provider_id(url_prefix, dumb_provider_id):
+    data, resp = get(url_prefix + ('arrivals?provider.id={0}'
+                                   .format(dumb_provider_id)))
+    assert len(data['arrivals']) == 0
+
+
+def test_arrivals_invalid_provider_id(url_prefix):
+    data, resp = get(url_prefix + 'arrivals?provider.id=butts')
+    assert len(data['arrivals']) == 0
