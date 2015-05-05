@@ -176,6 +176,8 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
                 provider.get, busbus.Agency, data['_agency_id'])
         if '_type' in data:
             pass  # FIXME
+        if data.get('name') is None:
+            data['name'] = data.pop('short_name')
 
         super(GTFSRoute, self).__init__(provider, **data)
 

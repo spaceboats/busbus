@@ -24,6 +24,18 @@ def test_len_routes(mbta_provider):
     assert len(list(mbta_provider.routes)) == 5
 
 
+def test_route_with_only_shortname(mbta_provider):
+    route = mbta_provider.get(busbus.Route, id=u'39')
+    assert route.name == u'39'
+    assert route.short_name is None
+
+
+def test_route_with_shortname_and_name(mbta_provider):
+    route = mbta_provider.get(busbus.Route, id=u'Logan-22')
+    assert route.short_name == 'Shuttle'
+    assert route.name == 'Massport Subway Shuttle (22)'
+
+
 def test_agency_phoneword_e164(mbta_provider):
     agency = mbta_provider.get(busbus.Agency, id=u'2')
     assert agency.phone_e164 == '+18002356426'
