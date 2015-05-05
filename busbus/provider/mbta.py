@@ -63,7 +63,7 @@ class MBTAArrivalGenerator(ArrivalGeneratorBase):
                     stops = route.stops
                 else:
                     stops = self.stops
-                stops = list(stops)
+                stops = list(busbus.Stop.add_children(stops))
 
                 resp = self.provider._mbta_realtime_call('predictionsbyroute',
                                                          {'route': route.id})

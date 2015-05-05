@@ -121,3 +121,11 @@ def test_realtime_logan_22(mbta_provider):
         mbta_provider, '2015-05-01T17:12:21-05:00', route_id='Logan-22'))
     assert len(arrs) == 120
     assert all(arr.realtime is False for arr in arrs)
+
+
+@responses.activate
+def test_predictionsbyroute_children(mbta_provider):
+    arrs = list(realtime_response_arrs(
+        mbta_provider, '2015-05-01T15:08:18-05:00',
+        stop_id='place-dwnxg', route_id='Orange'))
+    assert len(arrs) > 0
