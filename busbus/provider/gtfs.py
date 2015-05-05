@@ -150,6 +150,15 @@ class GTFSStop(SQLEntityMixin, busbus.Stop):
         super(GTFSStop, self).__init__(provider, **data)
 
     @property
+    def routes(self):
+        result = self.provider.conn.cursor().execute(
+            '''select route_id from _stops_routes where
+            stop_id=? and _feed=?''',
+            (self.id, self.provider.feed_id))
+        return Queryable(self.provider.get(busbus.Route, row['route_id'])
+                         for row in result)
+
+    @property
     def children(self):
         result = self._query(parent_station=self.id)
         return Queryable(GTFSStop(self.provider, **dict(row))
@@ -178,6 +187,15 @@ class GTFSRoute(SQLEntityMixin, busbus.Route):
             pass  # FIXME
 
         super(GTFSRoute, self).__init__(provider, **data)
+
+    @property
+    def stops(self):
+        result = self.provider.conn.cursor().execute(
+            '''select stop_id from _stops_routes where
+            route_id=? and _feed=?''',
+            (self.id, self.provider.feed_id))
+        return Queryable(self.provider.get(busbus.Stop, row['stop_id'])
+                         for row in result)
 
     @property
     def directions(self):
@@ -216,27 +234,40 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
                                                    start, end)
 
         if self.stops is None:
-            self.stops = self.provider.stops
-        if self.routes is None:
-            self.routes = self.provider.routes
+            if self.routes is None:
+                self.stops = self.provider.stops
+                self.routes = self.provider.routes
+            else:
+                stops_dict = {}
+                for route in self.routes:
+                    for stop in route.stops:
+                        stops_dict[stop.id] = stop
+                self.stops = stops_dict.values()
+        else:
+            if self.routes is None:
+                routes_dict = {}
+                for stop in self.stops:
+                    for route in stop.routes:
+                        routes_dict[route.id] = route
+                self.routes = routes_dict.values()
 
         self.service_cache = {}
         self.freq_cache = {}
         self.it = None
 
     def _stop_times(self, stop, route):
-        st_query = """select distinct min_arrival_time, service_id,
-            trip_headsign, trip_short_name, bikes_allowed,
-            coalesce(st.arrival_time, st._arrival_interpolate) as arr,
-            departure_time, st.trip_id as trip_id
-        from trips_v as t join stop_times as st on
-            t.trip_id=st.trip_id and t._feed=st._feed
-        where route_id=:route_id and stop_id=:stop_id and
-            t._feed=:_feed order by arrival_time asc"""
-        cur = self.provider.conn.cursor()
-        return cur.execute(st_query, {
-            'route_id': route.id, 'stop_id': stop.id,
-            '_feed': self.provider.feed_id})
+        return self.provider.conn.cursor().execute(
+            '''select t.*, arr, departure_time from
+                (select trip_id, _min_arrival_time, service_id, trip_headsign,
+                trip_short_name, bikes_allowed from trips where
+                route_id=:route_id and _feed=:_feed) as t
+            join
+                (select trip_id, coalesce(arrival_time, _arrival_interpolate)
+                as arr, departure_time from stop_times where stop_id=:stop_id
+                and _feed=:_feed) as st
+            on t.trip_id=st.trip_id order by arr asc''',
+            {'stop_id': stop.id, 'route_id': route.id,
+             '_feed': self.provider.feed_id})
 
     def _build_iterable(self):
         iters = []
@@ -266,7 +297,7 @@ class GTFSArrivalGenerator(ArrivalGeneratorBase):
                       arrow.Arrow.range('day', self.start.floor('day'),
                                         self.end.ceil('day')))
         freqs = self._frequencies(stop_time['trip_id'])
-        trip_start = datetime.timedelta(seconds=stop_time['min_arrival_time'])
+        trip_start = stop_time['_min_arrival_time']
         for day in days:
             # GTFS time is relative to noon
             day = day.replace(hours=12)
@@ -425,13 +456,14 @@ class GTFSMixin(object):
                         cur.executemany(stmt, (row_gen(row) for row in data))
             cur.execute('commit transaction')
 
-            # interpolate missing stop times
             cur.execute('begin transaction')
             for row in cur.execute(
-                    '''select distinct trip_id from stop_times where
-                    arrival_time is null and _feed=?''', (self.feed_id,)):
+                    '''select trip_id from trips where _feed=?''',
+                    (self.feed_id,)):
                 innercur = self.conn.cursor()
                 trip_id = row['trip_id']
+
+                # interpolate missing stop times
                 known_times = {r['seq']: dict(r) for r in innercur.execute(
                     '''select arrival_time as a, departure_time as d,
                     stop_sequence as seq from stop_times where trip_id=:trip_id
@@ -461,6 +493,23 @@ class GTFSMixin(object):
                         stop_sequence=:seq''',
                         {'trip_id': trip_id, '_feed': self.feed_id,
                          'a': time, 'seq': seq})
+
+                # fill in _min_arrival_time
+                min_time = innercur.execute(
+                    '''select min(coalesce(arrival_time, _arrival_interpolate))
+                    as min_time from stop_times where trip_id=? and _feed=?''',
+                    (trip_id, self.feed_id)).fetchone()['min_time']
+                innercur.execute('''update trips set _min_arrival_time=?
+                                 where trip_id=? and _feed=?''',
+                                 (min_time, trip_id, self.feed_id))
+
+            cur.execute(
+                '''insert into _stops_routes (stop_id, route_id, _feed)
+                select distinct st.stop_id, t.route_id, t._feed from
+                (select trip_id, stop_id from stop_times where _feed=:_feed)
+                as st join
+                (select trip_id, route_id, _feed from trips where _feed=:_feed)
+                as t on st.trip_id=t.trip_id''', {'_feed': self.feed_id})
             cur.execute('commit transaction')
 
     def _query(self, cls, **kwargs):

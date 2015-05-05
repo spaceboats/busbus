@@ -170,9 +170,22 @@ def test_stop_distance_to_latlon(provider):
     assert 43.6 < stop.distance_to(36.915682, -116.751677) / 1000 < 43.7
 
 
+def test_stop_routes(provider):
+    routes = list(provider.get(busbus.Stop, u'AMV').routes)
+    assert len(routes) == 1
+    assert routes[0].id == u'AAMV'
+
+
 def test_routes_agency(provider):
     for route in provider.routes:
         assert route.agency.id == 'DTA'
+
+
+def test_route_stops(provider):
+    stops = list(provider.get(busbus.Route, u'CITY').stops)
+    assert len(stops) == 5
+    assert set(stop.id for stop in stops) == set((u'STAGECOACH', u'NANAA',
+                                                  u'NADAV', u'DADAN', u'EMSI'))
 
 
 @pytest.mark.parametrize('time,stop_id,count', [
