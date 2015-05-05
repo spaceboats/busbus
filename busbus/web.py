@@ -126,12 +126,10 @@ class Engine(busbus.Engine):
                     provider_id = kwargs.pop('provider.id')
                     if provider_id in self._providers:
                         provider = self._providers[provider_id]
-                        print('using {0}'.format(provider))
                         entity_func = getattr(provider, entity, None)
                     else:
                         entity_func = Queryable(())
                 else:
-                    print('using {0}'.format(self))
                     entity_func = getattr(self, entity, None)
                 if entity_func is not None:
                     result = entity_func.where(**kwargs)
