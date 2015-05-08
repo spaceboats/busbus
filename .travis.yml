@@ -5,7 +5,7 @@ python:
   - "3.4"
 sudo: false
 env:
-  - "APSW_VERSION=3.8.8.2-r1"
+  - "APSW_VERSION=3.8.9-r1"
 before_install:
   - "gpg --keyserver hkp://keys.gnupg.net --recv-keys 02DA39A85354DD3D7343EFC198E39F1E0DFBD904"
   - "wget https://github.com/rogerbinns/apsw/releases/download/$APSW_VERSION/apsw-$APSW_VERSION.zip https://github.com/rogerbinns/apsw/releases/download/$APSW_VERSION/apsw-$APSW_VERSION-sigs.zip"
