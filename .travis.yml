@@ -13,7 +13,7 @@ before_install:
   - "unzip apsw-$APSW_VERSION.zip"
 install:
   - "pip install -U pip setuptools"
-  - "cd apsw-$APSW_VERSION && python setup.py fetch --all build --enable-all-extensions install test && cd .. && rm -rf apsw-$APSW_VERSION apsw-$APSW_VERSION.zip"
+  - "cd apsw-$APSW_VERSION && python setup.py fetch --all --version=$(echo $APSW_VERSION | cut -d - -f 1) build --enable-all-extensions install test && cd .. && rm -rf apsw-$APSW_VERSION apsw-$APSW_VERSION.zip"
   - "pip install -e . -e .[dev] -e .[web]"
 script: "coverage run --source busbus -m pytest --pep8"
 after_script:
