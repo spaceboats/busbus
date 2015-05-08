@@ -1,8 +1,29 @@
 from setuptools import setup, find_packages
+from setuptools.command.test import test as TestCommand
+
 import collections
 import os
+import sys
 
 SETUP_DIR = os.path.abspath(os.path.dirname(__file__))
+
+
+class PyTest(TestCommand):
+    user_options = [('pytest-args=', 'a', "Arguments to pass to py.test")]
+
+    def initialize_options(self):
+        TestCommand.initialize_options(self)
+        self.pytest_args = ['--pep8']
+
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+
+    def run_tests(self):
+        import pytest
+        errno = pytest.main(self.pytest_args)
+        sys.exit(errno)
 
 
 class ExtraRequires(collections.Mapping):
@@ -42,5 +63,9 @@ setup(
         'busbus.provider': ['*.sql'],
     },
     install_requires=list(get_requires()),
+    tests_require=list(get_requires('dev-requirements.txt')),
     extras_require=ExtraRequires(),
+    cmdclass={
+        'test': PyTest,
+    },
 )
