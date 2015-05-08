@@ -38,6 +38,9 @@ setup(
     license='MIT',
     url='https://github.com/spaceboats/busbus',
     packages=find_packages(),
+    package_data={
+        'busbus.provider': ['*.sql'],
+    },
     install_requires=list(get_requires()),
     extras_require=ExtraRequires(),
 )
