@@ -34,7 +34,7 @@ def get_requires(filename='requirements.txt'):
 
 setup(
     name='busbus',
-    version='0.0.1',
+    version='0.1.0',
     license='MIT',
     url='https://github.com/spaceboats/busbus',
     packages=find_packages(),
