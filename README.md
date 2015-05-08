@@ -1,4 +1,4 @@
-# busbus
+# busbus :bus: :bus:
 
 [![Build Status](https://travis-ci.org/spaceboats/busbus.svg?branch=master)](https://travis-ci.org/spaceboats/busbus)
 [![Coverage Status](https://img.shields.io/coveralls/spaceboats/busbus.svg?style=flat)](https://coveralls.io/r/spaceboats/busbus)
