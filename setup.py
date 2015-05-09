@@ -101,9 +101,16 @@ def fetch_test_data():
                             f.write(z.read(prefix + filename))
 
 
+with open('README.rst') as f:
+    long_description = f.read().replace(' :bus:', '')
+
 setup(
     name='busbus',
     version=VERSION,
+    author='Ian Weller',
+    author_email='ianweller@buttslol.net',
+    description='A platform for working with public transit data',
+    long_description=long_description,
     license='MIT',
     url='https://github.com/spaceboats/busbus',
     packages=['busbus'],
