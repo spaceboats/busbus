@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from setuptools.command.test import test as TestCommand
 
 import collections
@@ -106,7 +106,7 @@ setup(
     version=VERSION,
     license='MIT',
     url='https://github.com/spaceboats/busbus',
-    packages=find_packages(),
+    packages=['busbus'],
     package_data={
         'busbus.provider': ['*.sql'],
     },
