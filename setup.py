@@ -12,11 +12,11 @@ class PyTest(TestCommand):
     user_options = [('pytest-args=', 'a', "Arguments to pass to py.test")]
 
     def initialize_options(self):
-        TestCommand.initialize_options(self)
+        super(PyTest, self).initialize_options()
         self.pytest_args = ['--pep8']
 
     def finalize_options(self):
-        TestCommand.finalize_options(self)
+        super(PyTest, self).finalize_options()
         self.test_args = []
         self.test_suite = True
 
