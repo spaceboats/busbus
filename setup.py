@@ -113,7 +113,7 @@ setup(
     long_description=long_description,
     license='MIT',
     url='https://github.com/spaceboats/busbus',
-    packages=['busbus'],
+    packages=['busbus', 'busbus.provider', 'busbus.util'],
     package_data={
         'busbus.provider': ['*.sql'],
     },
