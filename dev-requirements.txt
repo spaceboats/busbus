@@ -1,8 +1,10 @@
-pytest
 pytest-pep8
-coverage
-python-coveralls
+pytest-cache
+# pytest needs to be below pytest-pep8 to work around a bug where setuptools
+# finds "pytest pep8" as the best match for pytest
+pytest
 wsgi_intercept
 mock
 responses
 httpbin
+wheel

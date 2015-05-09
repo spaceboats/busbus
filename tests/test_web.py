@@ -2,14 +2,15 @@
 
 from busbus.provider import ProviderBase
 from busbus.queryable import Queryable
-import busbus.web
 from .conftest import SampleGTFSProvider, mock_gtfs_zip
 
-import cherrypy
 import pytest
 import responses
 import requests
 from wsgi_intercept import requests_intercept, add_wsgi_intercept
+
+web = pytest.importorskip('busbus.web')
+cherrypy = pytest.importorskip('cherrypy')
 
 
 class DumbUselessProvider(ProviderBase):
@@ -36,7 +37,7 @@ class DumbUselessProvider(ProviderBase):
 
 @pytest.fixture(scope='module')
 def web_engine(engine_config):
-    engine = busbus.web.Engine(engine_config)
+    engine = web.Engine(engine_config)
     responses.add(responses.GET, SampleGTFSProvider.gtfs_url,
                   body=mock_gtfs_zip('_sample'), status=200,
                   content_type='application/zip')
@@ -129,7 +130,7 @@ def test_unexpand_none(url_prefix):
 
 
 def test_unexpand_dict():
-    assert busbus.web.unexpand({1: 2}, ()) == {1: 2}
+    assert web.unexpand({1: 2}, ()) == {1: 2}
 
 
 def test_unexpand_agencies(url_prefix):
