@@ -1,7 +1,5 @@
 pytest
 pytest-pep8
-coverage
-python-coveralls
 wsgi_intercept
 mock
 responses
