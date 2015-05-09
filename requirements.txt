@@ -12,3 +12,5 @@ phonenumbers
 arrow
 # another python sqlite wrapper -- zlib license (or any OSI-approved license)
 apsw
+# setup.py uses setuptools, various code uses pkg_resources
+setuptools
