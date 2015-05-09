@@ -6,3 +6,4 @@ wsgi_intercept
 mock
 responses
 httpbin
+wheel
